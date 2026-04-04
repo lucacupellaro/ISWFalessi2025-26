@@ -1,0 +1,12 @@
+settings:
+  maxTicketsPerProject: 500
+  maxTicketsPercent: 80
+  maxVersionsPerProject: 50
+  maxVersionsPercent: 100
+  pageSize: 100
+
+projects:
+  - key: KAFKA
+    jql: "issuetype = Bug AND status in (Closed, Resolved) AND resolution = Fixed"
+  - key: BOOKKEEPER
+    jql: "issuetype = Bug AND status in (Closed, Resolved) AND resolution = Fixed"
