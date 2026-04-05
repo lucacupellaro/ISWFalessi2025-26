@@ -26,6 +26,7 @@ public class JiraHttpClient {
     }
 
     public String fetchIssues(String jql, int startAt, int maxResults) {
+        System.out.println("[HTTP] Chiamata Jira issues — startAt=" + startAt + " maxResults=" + maxResults);
         String url = baseUrl + "/rest/api/2/search"
                 + "?jql=" + URLEncoder.encode(jql, StandardCharsets.UTF_8)
                 + "&startAt=" + startAt

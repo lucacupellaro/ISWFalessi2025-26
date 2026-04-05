@@ -1,17 +1,21 @@
 package service;
 
-
-
 import domain.BugTicket;
+import domain.ProjectVersion;
 import domain.VersionRelation;
 
+import java.util.List;
+
 /**
- * Valida la consistenza di un ticket prima che arrivi al controller.
- * Scarta ticket con dati mancanti o incoerenti.
+ * Valida la consistenza di un ticket e verifica che la fix version
+ * rientri nelle versioni ammesse (escluso l'ultimo 66%).
  */
 public class ConsistencyService {
 
-    public boolean isValid(BugTicket ticket, VersionRelation versionRelation) {
+    public boolean isValid(BugTicket ticket,
+                           VersionRelation versionRelation,
+                           List<ProjectVersion> allowedVersions) {
+
         if (ticket.getCreationDate() == null || ticket.getResolutionDate() == null) {
             return false;
         }
@@ -21,6 +25,10 @@ public class ConsistencyService {
         if (versionRelation.getFixVersion() == null) {
             return false;
         }
-        return true;
+
+        // la fix version deve essere tra le versioni ammesse
+        String fixName = versionRelation.getFixVersion().getName();
+        return allowedVersions.stream()
+                .anyMatch(v -> v.getName().equals(fixName));
     }
 }

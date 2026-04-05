@@ -1,8 +1,10 @@
 package org.example;
 
+import config.AppConfig;
 import controller.AppController;
 import domain.BugTicketRecord;
 
+import java.io.InputStream;
 import java.util.List;
 
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
@@ -13,14 +15,33 @@ public class Main {
         String username = "";
         String token = "";
 
+        //recupero informazione dal file project che vine mappato tramite json nella classe AppConfig
+        AppConfig config = AppConfig.load();
+        int percent = config.getSettings().getMaxVersionsPercent();
+
+
+        System.out.println("Si recuperano tutti i ticket del " + percent + "% delle release più vecchie");
+        System.out.println("Progetti: " + config.getProjects().stream()
+                .map(p -> p.getKey())
+                .toList());
+
         AppController controller = new AppController(baseUrl, username, token);
         List<BugTicketRecord> records = controller.run();
 
+
+
         System.out.println("Ticket validi recuperati: " + records.size());
         records.forEach(r -> System.out.println(
-                r.getId()
+                "progetto: " + r.getProjectKey()
+                        + " | id: " + r.getId()
+                        + " | release associata: " + (r.getAssociatedRelease() != null ? r.getAssociatedRelease().getName() : "n/a")
+                        + " | release date: " + (r.getAssociatedRelease() != null && r.getAssociatedRelease().getReleaseDate() != null ? r.getAssociatedRelease().getReleaseDate() : "n/a")
+                        + " | creazione: " + (r.getCreationDate() != null ? r.getCreationDate() : "n/a")
+                        + " | risoluzione: " + (r.getResolutionDate() != null ? r.getResolutionDate() : "n/a")
                         + " | fix: " + (r.getFixVersion() != null ? r.getFixVersion().getName() : "n/a")
-                        + " | affected: " + r.getAffectedVersions().size()
+                        + " | fix release date: " + (r.getFixVersion() != null && r.getFixVersion().getReleaseDate() != null ? r.getFixVersion().getReleaseDate() : "n/a")
+                        + " | affected count: " + r.getAffectedVersions().size()
+                        + " | affected: " + r.getAffectedVersions().stream().map(v -> v.getName()).toList()
         ));
     }
 }

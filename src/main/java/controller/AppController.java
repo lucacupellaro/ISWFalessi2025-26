@@ -1,7 +1,5 @@
 package controller;
 
-
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import client.JiraHttpClient;
@@ -10,19 +8,20 @@ import config.AppConfig;
 import config.ProjectConfig;
 import domain.BugTicket;
 import domain.BugTicketRecord;
+import domain.ProjectVersion;
 import domain.VersionRelation;
 import mapper.JiraIssueDto;
 import mapper.JiraMapper;
 import service.ConsistencyService;
 import service.VersionService;
+import util.ProgressLogger;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
+
 import java.util.List;
 
-/**
- * Punto centrale dell'applicazione. Coordina tutti i layer,
- * crea le entità di dominio e le assembla in BugTicketRecord.
- */
 public class AppController {
 
     private final AppConfig config;
@@ -31,6 +30,7 @@ public class AppController {
     private final ConsistencyService consistencyService;
     private final VersionService versionService;
     private final ObjectMapper objectMapper;
+    private final ProgressLogger logger = new ProgressLogger();
 
     public AppController(String baseUrl, String username, String token) {
         this.config = AppConfig.load();
@@ -43,11 +43,10 @@ public class AppController {
 
     public List<BugTicketRecord> run() {
         List<BugTicketRecord> results = new ArrayList<>();
-
         for (ProjectConfig project : config.getProjects()) {
             results.addAll(processProject(project));
         }
-
+        logger.logGlobalDone(results.size());
         return results;
     }
 
@@ -57,45 +56,106 @@ public class AppController {
         int startAt = 0;
         int fetched = 0;
 
+        logger.logProjectStart(project.getKey());
+
+        List<ProjectVersion> allowedVersions = versionService.loadVersions(
+                project.getKey(),
+                config.getSettings().getMaxVersionsPercent()
+        );
+        logger.logVersionsLoaded(project.getKey(), allowedVersions.size());
+
         while (true) {
             String json = issueClient.fetchIssues(project.getJql(), startAt, pageSize);
-            List<JiraIssueDto> dtos = parseIssues(json);
+            JsonNode root = parseJson(json);
+            List<JiraIssueDto> dtos = parseIssues(root);
 
             if (dtos.isEmpty()) {
                 break;
             }
 
-            int total = parseTotalAvailable(json);
+            int total = parseTotalAvailable(root);
             int maxAllowed = config.resolvedMaxTickets(total);
+
+            logger.logPageFetched(project.getKey(), startAt, fetched, maxAllowed);
 
             for (JiraIssueDto dto : dtos) {
                 if (fetched >= maxAllowed) {
                     break;
                 }
 
-                BugTicket ticket = mapper.toBugTicket(dto);
-                VersionRelation versionRelation = mapper.toVersionRelation(dto);
+                BugTicket ticket = mapper.toBugTicket(dto); //creo la classe ticket
+                VersionRelation versionRelation = mapper.toVersionRelation(dto);  //creo la classe versione
+                VersionRelation enriched = enrichVersionRelation(versionRelation, allowedVersions); //il problema potrebbe stare qui
+                ProjectVersion associatedRelease = findAssociatedRelease(ticket, allowedVersions);
 
-                if (consistencyService.isValid(ticket, versionRelation)) {
-                    records.add(new BugTicketRecord(ticket, versionRelation));
+                if (consistencyService.isValid(ticket, enriched, allowedVersions)) {
+                    records.add(new BugTicketRecord(ticket, enriched, associatedRelease, project.getKey()));
+                    logger.logTicketValid(ticket.getId());
                     fetched++;
+                } else {
+                    logger.logTicketDiscarded(ticket.getId(), "dati mancanti o versione non ammessa");
                 }
             }
 
             if (fetched >= maxAllowed || dtos.size() < pageSize) {
                 break;
             }
-
             startAt += pageSize;
         }
 
+        logger.logProjectDone(project.getKey(), records.size());
         return records;
     }
 
-    private List<JiraIssueDto> parseIssues(String json) {
+    private ProjectVersion findAssociatedRelease(BugTicket ticket,
+                                                 List<ProjectVersion> allowedVersions) {
+        if (ticket.getResolutionDate() == null) {
+            return null;
+        }
+        LocalDate resolutionDate = ticket.getResolutionDate().toLocalDate();
+
+        return allowedVersions.stream()
+                .filter(v -> v.getReleaseDate() != null)
+                .filter(v -> !v.getReleaseDate().isBefore(resolutionDate))
+                .min(Comparator.comparing(ProjectVersion::getReleaseDate))
+                .orElse(null);
+    }
+
+    private VersionRelation enrichVersionRelation(VersionRelation versionRelation,
+                                                  List<ProjectVersion> allowedVersions) {
+        ProjectVersion enrichedFix = null;
+        if (versionRelation.getFixVersion() != null) {
+            String fixName = versionRelation.getFixVersion().getName();
+            enrichedFix = allowedVersions.stream()
+                    .filter(v -> v.getName().equals(fixName))
+                    .findFirst()
+                    .orElse(versionRelation.getFixVersion());
+        }
+
+        List<ProjectVersion> enrichedAffected = versionRelation.getAffectedVersions().stream()
+                .map(av -> allowedVersions.stream()
+                        .filter(v -> v.getName().equals(av.getName()))
+                        .findFirst()
+                        .orElse(av))
+                .toList();
+
+        return new VersionRelation(enrichedFix, enrichedAffected);
+    }
+
+    private JsonNode parseJson(String json) {
         try {
-            JsonNode root = objectMapper.readTree(json);
+            return objectMapper.readTree(json);
+        } catch (Exception e) {
+            throw new IllegalStateException("Errore parsing risposta Jira: " + e.getMessage(), e);
+        }
+    }
+
+    private List<JiraIssueDto> parseIssues(JsonNode root) {
+        try {
             JsonNode issues = root.get("issues");
+            if (issues == null || issues.isNull()) {
+                return List.of();
+            }
             return objectMapper.readValue(
                     issues.toString(),
                     objectMapper.getTypeFactory()
@@ -105,25 +165,8 @@ public class AppController {
         }
     }
 
-    private int parseTotalAvailable(String json) {
-        try {
-            return objectMapper.readTree(json).get("total").asInt();
-        } catch (Exception e) {
-            return 0;
-        }
-    }
-
-    public static void main(String[] args) {
-        String baseUrl = "https://yourorg.atlassian.net";
-        String username = "your@email.com";
-        String token = "your-api-token";
-
-        AppController controller = new AppController(baseUrl, username, token);
-        List<BugTicketRecord> records = controller.run();
-
-        System.out.println("Ticket validi recuperati: " + records.size());
-        records.forEach(r -> System.out.println(r.getId()
-                + " | fix: " + (r.getFixVersion() != null ? r.getFixVersion().getName() : "n/a")
-                + " | affected: " + r.getAffectedVersions().size()));
+    private int parseTotalAvailable(JsonNode root) {
+        JsonNode total = root.get("total");
+        return (total != null && !total.isNull()) ? total.asInt() : 0;
     }
 }

@@ -10,14 +10,27 @@ public class VersionRelation {
 
     private final ProjectVersion fixVersion;
     private final List<ProjectVersion> affectedVersions;
+    private ProjectVersion openingVersion;
 
     public VersionRelation(ProjectVersion fixVersion, List<ProjectVersion> affectedVersions) {
         this.fixVersion = fixVersion;
         this.affectedVersions = List.copyOf(affectedVersions);
     }
 
+
+    public VersionRelation(ProjectVersion fixVersion, List<ProjectVersion> affectedVersions, ProjectVersion openingVersion) {
+        this.fixVersion = fixVersion;
+        this.affectedVersions = List.copyOf(affectedVersions);
+        this.openingVersion = openingVersion;
+    }
+
     public ProjectVersion getFixVersion() {
         return fixVersion;
+    }
+
+
+    public ProjectVersion getOpeningVersion() {
+        return openingVersion;
     }
 
     public List<ProjectVersion> getAffectedVersions() {

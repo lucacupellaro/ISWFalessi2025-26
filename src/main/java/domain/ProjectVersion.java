@@ -8,7 +8,7 @@ import java.time.LocalDate;
 public class ProjectVersion {
 
     private final String name;
-    private final LocalDate releaseDate;
+    private final LocalDate releaseDate; //data ufficiale della relase chiudendeo i fix previsti
 
     public ProjectVersion(String name, LocalDate releaseDate) {
         this.name = name;

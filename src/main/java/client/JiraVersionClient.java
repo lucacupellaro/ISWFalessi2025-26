@@ -24,6 +24,9 @@ public class JiraVersionClient {
     }
 
     public String fetchVersions(String projectKey) {
+        System.out.println("[HTTP] Chiamata Jira versioni — progetto: " + projectKey);
+
+
         String url = baseUrl + "/rest/api/2/project/" + projectKey + "/versions";
 
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
