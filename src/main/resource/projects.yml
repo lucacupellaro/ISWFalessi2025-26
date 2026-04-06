@@ -3,7 +3,7 @@ settings:
   maxTicketsPerProject: 0
   maxTicketsPercent: 100
   maxVersionsPerProject: 0
-  maxVersionsPercent: 5
+  maxVersionsPercent: 33
   pageSize: 1000 #quanti ticket Jira ti restituisce in una singola chiamata HTTP.
 
 projects:

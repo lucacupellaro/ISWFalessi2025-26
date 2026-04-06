@@ -88,12 +88,13 @@ public class AppController {
                 VersionRelation enriched = enrichVersionRelation(versionRelation, allowedVersions); //il problema potrebbe stare qui
                 ProjectVersion associatedRelease = findAssociatedRelease(ticket, allowedVersions);
 
-                if (consistencyService.isValid(ticket, enriched, allowedVersions)) {
-                    records.add(new BugTicketRecord(ticket, enriched, associatedRelease, project.getKey()));
+                String reason = consistencyService.getDiscardReason(ticket, enriched, allowedVersions);
+                if (reason == null) {
+                    records.add(new BugTicketRecord(ticket, enriched, enriched.getFixVersion(), project.getKey()));
                     logger.logTicketValid(ticket.getId());
                     fetched++;
                 } else {
-                    logger.logTicketDiscarded(ticket.getId(), "dati mancanti o versione non ammessa");
+                    logger.logTicketDiscarded(ticket.getId(), reason);
                 }
             }
 
@@ -107,6 +108,7 @@ public class AppController {
         return records;
     }
 
+    //Dato un BugTicket, cerca la release associata al bug, cioè la prima release la cui data è uguale o successiva alla data di risoluzione del ticket.
     private ProjectVersion findAssociatedRelease(BugTicket ticket,
                                                  List<ProjectVersion> allowedVersions) {
         if (ticket.getResolutionDate() == null) {
@@ -121,6 +123,7 @@ public class AppController {
                 .orElse(null);
     }
 
+    //Il metodo verifica se le versioni del ticket coincidono (per nome) con quelle ufficiali del progetto e, se esiste una corrispondenza, sostituisce l’oggetto con quello ufficiale.
     private VersionRelation enrichVersionRelation(VersionRelation versionRelation,
                                                   List<ProjectVersion> allowedVersions) {
         ProjectVersion enrichedFix = null;
