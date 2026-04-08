@@ -18,15 +18,15 @@ public class PrintOnCsv {
     private static final String SEPARATOR = ",";
     private static final String HEADER = String.join(SEPARATOR,
             "projectKey",
-            "id",
-            "creationDate",
-            "resolutionDate",
-            "associatedRelease",
-            "associatedReleaseDate",
+            "idTicket",
+            "creationDateTicket",
+            "resolutionDateTicket",
             "fixVersion",
             "fixVersionReleaseDate",
             "affectedVersionsCount",
-            "affectedVersions"
+            "affectedVersions",
+            "openingVersion",
+            "openingVersionReleaseDate"
     );
 
     public void print(List<BugTicketRecord> records) {
@@ -47,14 +47,13 @@ public class PrintOnCsv {
     }
 
     private String buildRow(BugTicketRecord r) {
+        ProjectVersion ov = r.getVersionRelation() != null ? r.getVersionRelation().getOpeningVersion() : null;
         return String.join(SEPARATOR,
                 safe(r.getProjectKey()),
                 safe(r.getId()),
                 safe(r.getCreationDate() != null ? r.getCreationDate().toString() : null),
                 safe(r.getResolutionDate() != null ? r.getResolutionDate().toString() : null),
-                safe(r.getAssociatedRelease() != null ? r.getAssociatedRelease().getName() : null),
-                safe(r.getAssociatedRelease() != null && r.getAssociatedRelease().getReleaseDate() != null
-                        ? r.getAssociatedRelease().getReleaseDate().toString() : null),
+
                 safe(r.getFixVersion() != null ? r.getFixVersion().getName() : null),
                 safe(r.getFixVersion() != null && r.getFixVersion().getReleaseDate() != null
                         ? r.getFixVersion().getReleaseDate().toString() : null),
@@ -62,7 +61,9 @@ public class PrintOnCsv {
                 safe(r.getAffectedVersions().stream()
                         .map(ProjectVersion::getName)
                         .reduce((a, b) -> a + "|" + b)
-                        .orElse("n/a"))
+                        .orElse("n/a")),
+                safe(ov != null ? ov.getName() : null),
+                safe(ov != null && ov.getReleaseDate() != null ? ov.getReleaseDate().toString() : null)
         );
     }
 

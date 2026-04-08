@@ -45,4 +45,15 @@ public class VersionService {
             throw new IllegalStateException("Errore parsing versioni: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * Restituisce la release più recente la cui data è precedente o uguale
+     * alla data di creazione del ticket (Opening Version).
+     */
+    public ProjectVersion findOpeningVersion(LocalDate creationDate, List<ProjectVersion> versions) {
+        return versions.stream()
+                .filter(v -> !v.getReleaseDate().isAfter(creationDate))
+                .max(Comparator.comparing(ProjectVersion::getReleaseDate))
+                .orElse(null);
+    }
 }

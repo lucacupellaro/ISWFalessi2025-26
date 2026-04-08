@@ -39,8 +39,7 @@ public class Main {
         records.forEach(r -> System.out.println(
                 "progetto: " + r.getProjectKey()
                         + " | id Ticket: " + r.getId()
-                        + " | release associata: " + (r.getAssociatedRelease() != null ? r.getAssociatedRelease().getName() : "n/a")
-                        + " | release date: " + (r.getAssociatedRelease() != null && r.getAssociatedRelease().getReleaseDate() != null ? r.getAssociatedRelease().getReleaseDate() : "n/a")
+
                         + " | creazione Ticket: " + (r.getCreationDate() != null ? r.getCreationDate() : "n/a")
                         + " | risoluzione Ticket: " + (r.getResolutionDate() != null ? r.getResolutionDate() : "n/a")
                         + " | fix: " + (r.getFixVersion() != null ? r.getFixVersion().getName() : "n/a")

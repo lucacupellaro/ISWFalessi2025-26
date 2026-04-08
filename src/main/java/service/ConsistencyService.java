@@ -36,6 +36,15 @@ public class ConsistencyService {
             return "fixVersion senza releaseDate";
         }
 
+        if (versionRelation.getAffectedVersions().stream()
+                .anyMatch(v -> v.getName().equals(fix.getName()))) {
+            return "fixVersion '" + fix.getName() + "' presente anche nelle affectedVersions";
+        }
+
+        if (versionRelation.getOpeningVersion() == null) {
+            return "no opening version";
+        }
+
         // la releaseDate della fix version deve essere coerente con la creationDate
         // un ticket non può essere stato aperto DOPO la release in cui è stato fixato
         if (fix.getReleaseDate().isBefore(ticket.getCreationDate().toLocalDate())) {

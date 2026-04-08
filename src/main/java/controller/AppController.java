@@ -83,14 +83,16 @@ public class AppController {
                     break;
                 }
 
-                BugTicket ticket = mapper.toBugTicket(dto); //creo la classe ticket
-                VersionRelation versionRelation = mapper.toVersionRelation(dto);  //creo la classe versione
-                VersionRelation enriched = enrichVersionRelation(versionRelation, allowedVersions); //il problema potrebbe stare qui
-                ProjectVersion associatedRelease = findAssociatedRelease(ticket, allowedVersions);
-
+                BugTicket ticket = mapper.toBugTicket(dto);
+                VersionRelation versionRelation = mapper.toVersionRelation(dto);
+                VersionRelation enriched = enrichVersionRelation(
+                        versionRelation,
+                        allowedVersions,
+                        ticket.getCreationDate().toLocalDate()  // <-- passa la data di creazione
+                );
                 String reason = consistencyService.getDiscardReason(ticket, enriched, allowedVersions);
                 if (reason == null) {
-                    records.add(new BugTicketRecord(ticket, enriched, enriched.getFixVersion(), project.getKey()));
+                    records.add(new BugTicketRecord(ticket, enriched,  project.getKey()));
                     logger.logTicketValid(ticket.getId());
                     fetched++;
                 } else {
@@ -108,24 +110,11 @@ public class AppController {
         return records;
     }
 
-    //Dato un BugTicket, cerca la release associata al bug, cioè la prima release la cui data è uguale o successiva alla data di risoluzione del ticket.
-    private ProjectVersion findAssociatedRelease(BugTicket ticket,
-                                                 List<ProjectVersion> allowedVersions) {
-        if (ticket.getResolutionDate() == null) {
-            return null;
-        }
-        LocalDate resolutionDate = ticket.getResolutionDate().toLocalDate();
-
-        return allowedVersions.stream()
-                .filter(v -> v.getReleaseDate() != null)
-                .filter(v -> !v.getReleaseDate().isBefore(resolutionDate))
-                .min(Comparator.comparing(ProjectVersion::getReleaseDate))
-                .orElse(null);
-    }
 
     //Il metodo verifica se le versioni del ticket coincidono (per nome) con quelle ufficiali del progetto e, se esiste una corrispondenza, sostituisce l’oggetto con quello ufficiale.
     private VersionRelation enrichVersionRelation(VersionRelation versionRelation,
-                                                  List<ProjectVersion> allowedVersions) {
+                                                  List<ProjectVersion> allowedVersions,
+                                                  LocalDate creationDate) {
         ProjectVersion enrichedFix = null;
         if (versionRelation.getFixVersion() != null) {
             String fixName = versionRelation.getFixVersion().getName();
@@ -142,7 +131,9 @@ public class AppController {
                         .orElse(av))
                 .toList();
 
-        return new VersionRelation(enrichedFix, enrichedAffected);
+        ProjectVersion openingVersion = versionService.findOpeningVersion(creationDate, allowedVersions);
+
+        return new VersionRelation(enrichedFix, enrichedAffected, openingVersion);
     }
 
     private JsonNode parseJson(String json) {
