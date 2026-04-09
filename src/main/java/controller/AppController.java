@@ -18,10 +18,16 @@ import util.ProgressLogger;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
-
 import java.util.List;
 
+/**
+ * Orchestratore centrale (L2).
+ * Unico punto che conosce tutti i layer:
+ *   - chiama L0 (client/config) per dati grezzi
+ *   - delega a L1 (mapper/service) per trasformazione e validazione
+ *   - assembla gli oggetti L3 (domain) e li restituisce
+ * Nessuna logica di business vive qui: il controller coordina, non decide.
+ */
 public class AppController {
 
     private final AppConfig config;
@@ -82,22 +88,7 @@ public class AppController {
                 if (fetched >= maxAllowed) {
                     break;
                 }
-
-                BugTicket ticket = mapper.toBugTicket(dto);
-                VersionRelation versionRelation = mapper.toVersionRelation(dto);
-                VersionRelation enriched = enrichVersionRelation(
-                        versionRelation,
-                        allowedVersions,
-                        ticket.getCreationDate().toLocalDate()  // <-- passa la data di creazione
-                );
-                String reason = consistencyService.getDiscardReason(ticket, enriched, allowedVersions);
-                if (reason == null) {
-                    records.add(new BugTicketRecord(ticket, enriched,  project.getKey()));
-                    logger.logTicketValid(ticket.getId());
-                    fetched++;
-                } else {
-                    logger.logTicketDiscarded(ticket.getId(), reason);
-                }
+                fetched += processTicket(dto, allowedVersions, project.getKey(), records);
             }
 
             if (fetched >= maxAllowed || dtos.size() < pageSize) {
@@ -110,30 +101,69 @@ public class AppController {
         return records;
     }
 
+    /**
+     * Processa un singolo ticket: mappa, arricchisce, valida e — se valido — aggiunge ai record.
+     * Restituisce 1 se il ticket è stato accettato, 0 se scartato.
+     */
+    private int processTicket(JiraIssueDto dto,
+                               List<ProjectVersion> allowedVersions,
+                               String projectKey,
+                               List<BugTicketRecord> records) {
+        BugTicket ticket = mapper.toBugTicket(dto);
+        ProjectVersion rawFix = mapper.toFixVersion(dto);
+        List<ProjectVersion> rawAffected = mapper.toAffectedVersions(dto);
 
-    //Il metodo verifica se le versioni del ticket coincidono (per nome) con quelle ufficiali del progetto e, se esiste una corrispondenza, sostituisce l’oggetto con quello ufficiale.
-    private VersionRelation enrichVersionRelation(VersionRelation versionRelation,
-                                                  List<ProjectVersion> allowedVersions,
-                                                  LocalDate creationDate) {
-        ProjectVersion enrichedFix = null;
-        if (versionRelation.getFixVersion() != null) {
-            String fixName = versionRelation.getFixVersion().getName();
-            enrichedFix = allowedVersions.stream()
-                    .filter(v -> v.getName().equals(fixName))
-                    .findFirst()
-                    .orElse(versionRelation.getFixVersion());
+        VersionRelation versionRelation = buildVersionRelation(
+                rawFix,
+                rawAffected,
+                allowedVersions,
+                ticket.getCreationDate() != null ? ticket.getCreationDate().toLocalDate() : null
+        );
+
+        String reason = consistencyService.getDiscardReason(ticket, versionRelation, allowedVersions);
+        if (reason == null) {
+            records.add(new BugTicketRecord(ticket, versionRelation, projectKey));
+            logger.logTicketValid(ticket.getId());
+            return 1;
         }
+        logger.logTicketDiscarded(ticket.getId(), reason);
+        return 0;
+    }
 
-        List<ProjectVersion> enrichedAffected = versionRelation.getAffectedVersions().stream()
-                .map(av -> allowedVersions.stream()
-                        .filter(v -> v.getName().equals(av.getName()))
-                        .findFirst()
-                        .orElse(av))
+    /**
+     * Unico punto in cui VersionRelation viene costruita.
+     * Arricchisce fix e affected versions con i metadati ufficiali (releaseDate)
+     * presi da allowedVersions, e calcola la opening version dalla creationDate.
+     */
+    private VersionRelation buildVersionRelation(ProjectVersion rawFix,
+                                                 List<ProjectVersion> rawAffected,
+                                                 List<ProjectVersion> allowedVersions,
+                                                 LocalDate creationDate) {
+        ProjectVersion enrichedFix = enrich(rawFix, allowedVersions);
+
+        List<ProjectVersion> enrichedAffected = rawAffected.stream()
+                .map(av -> enrich(av, allowedVersions))
                 .toList();
 
-        ProjectVersion openingVersion = versionService.findOpeningVersion(creationDate, allowedVersions);
+        ProjectVersion openingVersion = creationDate != null
+                ? versionService.findOpeningVersion(creationDate, allowedVersions)
+                : null;
 
         return new VersionRelation(enrichedFix, enrichedAffected, openingVersion);
+    }
+
+    /**
+     * Sostituisce una versione grezza con quella ufficiale (con releaseDate) se il nome coincide.
+     * Se non trovata, restituisce la versione originale.
+     */
+    private ProjectVersion enrich(ProjectVersion raw, List<ProjectVersion> allowedVersions) {
+        if (raw == null) {
+            return null;
+        }
+        return allowedVersions.stream()
+                .filter(v -> v.getName().equals(raw.getName()))
+                .findFirst()
+                .orElse(raw);
     }
 
     private JsonNode parseJson(String json) {

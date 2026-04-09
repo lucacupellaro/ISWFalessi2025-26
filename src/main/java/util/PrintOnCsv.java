@@ -1,7 +1,6 @@
 package util;
 
 import domain.BugTicketRecord;
-import domain.ProjectVersion;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -10,6 +9,8 @@ import java.util.List;
 
 /**
  * Scrive la lista di BugTicketRecord su un file CSV.
+ * Dipende esclusivamente da BugTicketRecord — nessuna conoscenza
+ * delle classi di dominio interne (ProjectVersion, VersionRelation).
  * Il file viene riscritto completamente ad ogni chiamata.
  */
 public class PrintOnCsv {
@@ -47,23 +48,21 @@ public class PrintOnCsv {
     }
 
     private String buildRow(BugTicketRecord r) {
-        ProjectVersion ov = r.getVersionRelation() != null ? r.getVersionRelation().getOpeningVersion() : null;
+        String affectedJoined = r.getAffectedVersionNames().isEmpty()
+                ? "n/a"
+                : String.join("|", r.getAffectedVersionNames());
+
         return String.join(SEPARATOR,
                 safe(r.getProjectKey()),
                 safe(r.getId()),
                 safe(r.getCreationDate() != null ? r.getCreationDate().toString() : null),
                 safe(r.getResolutionDate() != null ? r.getResolutionDate().toString() : null),
-
-                safe(r.getFixVersion() != null ? r.getFixVersion().getName() : null),
-                safe(r.getFixVersion() != null && r.getFixVersion().getReleaseDate() != null
-                        ? r.getFixVersion().getReleaseDate().toString() : null),
-                safe(String.valueOf(r.getAffectedVersions().size())),
-                safe(r.getAffectedVersions().stream()
-                        .map(ProjectVersion::getName)
-                        .reduce((a, b) -> a + "|" + b)
-                        .orElse("n/a")),
-                safe(ov != null ? ov.getName() : null),
-                safe(ov != null && ov.getReleaseDate() != null ? ov.getReleaseDate().toString() : null)
+                safe(r.getFixVersionName()),
+                safe(r.getFixVersionReleaseDate()),
+                safe(String.valueOf(r.getAffectedVersionsCount())),
+                safe(affectedJoined),
+                safe(r.getOpeningVersionName()),
+                safe(r.getOpeningVersionReleaseDate())
         );
     }
 

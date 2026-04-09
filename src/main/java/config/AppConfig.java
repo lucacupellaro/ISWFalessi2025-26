@@ -22,9 +22,7 @@ public class AppConfig {
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
         try (InputStream is = AppConfig.class
                 .getClassLoader()
-                .getResourceAsStream("" +
-                        "" +
-                        "projects.yml")) {
+                .getResourceAsStream("projects.yml")) {
             return mapper.readValue(is, AppConfig.class);
         } catch (Exception e) {
             throw new IllegalStateException("Impossibile caricare projects.yml", e);

@@ -8,11 +8,7 @@ import java.util.List;
 
 public class ConsistencyService {
 
-    public boolean isValid(BugTicket ticket,
-                           VersionRelation versionRelation,
-                           List<ProjectVersion> allowedVersions) {
-        return getDiscardReason(ticket, versionRelation, allowedVersions) == null;
-    }
+
 
     public String getDiscardReason(BugTicket ticket,
                                    VersionRelation versionRelation,
