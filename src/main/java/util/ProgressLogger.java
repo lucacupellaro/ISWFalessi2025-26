@@ -33,4 +33,8 @@ public class ProgressLogger {
     public void logGlobalDone(int total) {
         System.out.println("Elaborazione completata. Totale ticket validi: " + total);
     }
+
+    public void logProportionComputed(double p) {
+        System.out.println("[PROPORTION] Valore P calcolato: " + String.format("%.4f", p));
+    }
 }

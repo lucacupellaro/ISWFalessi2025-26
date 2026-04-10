@@ -1,12 +1,11 @@
 package domain;
 
-
 import java.time.LocalDateTime;
 import java.util.List;
 
 /**
  * Oggetto finale immutabile che aggrega tutte le informazioni di un bug ticket:
- * dati anagrafici, fix version, affected versions e opening version.
+ * dati anagrafici, fix version, affected versions, opening version e injection version.
  * Espone metodi delegati flat per i dati delle versioni,
  * così i consumatori (es. PrintOnCsv) non dipendono da ProjectVersion.
  */
@@ -28,16 +27,24 @@ public class BugTicketRecord {
 
     // --- Dati anagrafici ---
 
-    public String getId() { return id; }
-    public String getProjectKey() { return projectKey; }
-    public LocalDateTime getCreationDate() { return creationDate; }
+    public String getId()                    { return id; }
+    public String getProjectKey()            { return projectKey; }
+    public LocalDateTime getCreationDate()   { return creationDate; }
     public LocalDateTime getResolutionDate() { return resolutionDate; }
+
+    /**
+     * Ricostruisce il BugTicket originale — usato da InjectionVersionEstimator
+     * per creare un nuovo BugTicketRecord con IV aggiornata.
+     */
+    public BugTicket toBugTicket() {
+        return new BugTicket(id, creationDate, resolutionDate);
+    }
 
     // --- Delegati fix version ---
 
     public String getFixVersionName() {
-        return versionRelation.getFixVersion() != null
-                ? versionRelation.getFixVersion().getName() : null;
+        ProjectVersion fix = versionRelation.getFixVersion();
+        return fix != null ? fix.getName() : null;
     }
 
     public String getFixVersionReleaseDate() {
@@ -69,6 +76,19 @@ public class BugTicketRecord {
         ProjectVersion ov = versionRelation.getOpeningVersion();
         return (ov != null && ov.getReleaseDate() != null)
                 ? ov.getReleaseDate().toString() : null;
+    }
+
+    // --- Delegati injection version ---
+
+    public String getInjectionVersionName() {
+        ProjectVersion iv = versionRelation.getInjectionVersion();
+        return iv != null ? iv.getName() : null;
+    }
+
+    public String getInjectionVersionReleaseDate() {
+        ProjectVersion iv = versionRelation.getInjectionVersion();
+        return (iv != null && iv.getReleaseDate() != null)
+                ? iv.getReleaseDate().toString() : null;
     }
 
     // --- Accesso strutturato (solo per AppController e domain) ---

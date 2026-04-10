@@ -4,6 +4,7 @@ import domain.BugTicket;
 import domain.ProjectVersion;
 import domain.VersionRelation;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public class ConsistencyService {
@@ -45,6 +46,19 @@ public class ConsistencyService {
         // un ticket non può essere stato aperto DOPO la release in cui è stato fixato
         if (fix.getReleaseDate().isBefore(ticket.getCreationDate().toLocalDate())) {
             return "fixVersion '" + fix.getName() + "' rilasciata prima della creazione del ticket";
+        }
+
+        // un ticket non può essere stato creato o chiuso prima della data di rilascio della prima versione
+        if (!allowedVersions.isEmpty()) {
+            LocalDate firstReleaseDate = allowedVersions.get(0).getReleaseDate();
+
+            if (ticket.getCreationDate().toLocalDate().isBefore(firstReleaseDate)) {
+                return "ticket creato prima della prima release (" + firstReleaseDate + ")";
+            }
+
+            if (ticket.getResolutionDate().toLocalDate().isBefore(firstReleaseDate)) {
+                return "ticket chiuso prima della prima release (" + firstReleaseDate + ")";
+            }
         }
 
         // la fix version deve essere tra le versioni ammesse

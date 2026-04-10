@@ -13,6 +13,8 @@ import domain.VersionRelation;
 import mapper.JiraIssueDto;
 import mapper.JiraMapper;
 import service.ConsistencyService;
+import service.InjectionVersionEstimator;
+import service.ProportionCalculator;
 import service.VersionService;
 import util.ProgressLogger;
 
@@ -36,6 +38,8 @@ public class AppController {
     private final ConsistencyService consistencyService;
     private final VersionService versionService;
     private final ObjectMapper objectMapper;
+    private final ProportionCalculator proportionCalculator;
+    private final InjectionVersionEstimator ivEstimator;
     private final ProgressLogger logger = new ProgressLogger();
 
     public AppController(String baseUrl, String username, String token) {
@@ -45,29 +49,48 @@ public class AppController {
         this.consistencyService = new ConsistencyService();
         this.versionService = new VersionService(new JiraVersionClient(baseUrl, username, token));
         this.objectMapper = new ObjectMapper();
+        this.proportionCalculator = new ProportionCalculator();
+        this.ivEstimator = new InjectionVersionEstimator();
     }
 
     public List<BugTicketRecord> run() {
         List<BugTicketRecord> results = new ArrayList<>();
+        List<ProjectVersion> allVersions = new ArrayList<>();
+
         for (ProjectConfig project : config.getProjects()) {
-            results.addAll(processProject(project));
+            List<ProjectVersion> versions = versionService.loadVersions(
+                    project.getKey(),
+                    config.getSettings().getMaxVersionsPercent()
+            );
+            allVersions.addAll(versions);
+            results.addAll(processProject(project, versions));
         }
+
+        results = new ArrayList<>(applyProportion(results, allVersions));
         logger.logGlobalDone(results.size());
         return results;
     }
 
-    private List<BugTicketRecord> processProject(ProjectConfig project) {
+    private List<BugTicketRecord> applyProportion(List<BugTicketRecord> records,
+                                                  List<ProjectVersion> versions) {
+        double p = proportionCalculator.computeP(records, versions);
+        logger.logProportionComputed(p);
+
+        return records.stream()
+                .map(r -> r.getVersionRelation().hasAffectedVersions()
+                        ? r
+                        : ivEstimator.estimateIv(r, p, versions))
+                .toList();
+    }
+
+    private List<BugTicketRecord> processProject(ProjectConfig project,
+                                                 List<ProjectVersion> allowedVersions) {
         List<BugTicketRecord> records = new ArrayList<>();
         int pageSize = config.getSettings().getPageSize();
         int startAt = 0;
         int fetched = 0;
 
         logger.logProjectStart(project.getKey());
-
-        List<ProjectVersion> allowedVersions = versionService.loadVersions(
-                project.getKey(),
-                config.getSettings().getMaxVersionsPercent()
-        );
         logger.logVersionsLoaded(project.getKey(), allowedVersions.size());
 
         while (true) {
@@ -101,14 +124,10 @@ public class AppController {
         return records;
     }
 
-    /**
-     * Processa un singolo ticket: mappa, arricchisce, valida e — se valido — aggiunge ai record.
-     * Restituisce 1 se il ticket è stato accettato, 0 se scartato.
-     */
     private int processTicket(JiraIssueDto dto,
-                               List<ProjectVersion> allowedVersions,
-                               String projectKey,
-                               List<BugTicketRecord> records) {
+                              List<ProjectVersion> allowedVersions,
+                              String projectKey,
+                              List<BugTicketRecord> records) {
         BugTicket ticket = mapper.toBugTicket(dto);
         ProjectVersion rawFix = mapper.toFixVersion(dto);
         List<ProjectVersion> rawAffected = mapper.toAffectedVersions(dto);
@@ -130,11 +149,6 @@ public class AppController {
         return 0;
     }
 
-    /**
-     * Unico punto in cui VersionRelation viene costruita.
-     * Arricchisce fix e affected versions con i metadati ufficiali (releaseDate)
-     * presi da allowedVersions, e calcola la opening version dalla creationDate.
-     */
     private VersionRelation buildVersionRelation(ProjectVersion rawFix,
                                                  List<ProjectVersion> rawAffected,
                                                  List<ProjectVersion> allowedVersions,
@@ -152,10 +166,6 @@ public class AppController {
         return new VersionRelation(enrichedFix, enrichedAffected, openingVersion);
     }
 
-    /**
-     * Sostituisce una versione grezza con quella ufficiale (con releaseDate) se il nome coincide.
-     * Se non trovata, restituisce la versione originale.
-     */
     private ProjectVersion enrich(ProjectVersion raw, List<ProjectVersion> allowedVersions) {
         if (raw == null) {
             return null;

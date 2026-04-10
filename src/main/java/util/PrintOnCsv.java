@@ -27,7 +27,9 @@ public class PrintOnCsv {
             "affectedVersionsCount",
             "affectedVersions",
             "openingVersion",
-            "openingVersionReleaseDate"
+            "openingVersionReleaseDate",
+            "injectionVersion",
+            "injectionVersionReleaseDate"
     );
 
     public void print(List<BugTicketRecord> records) {
@@ -62,7 +64,9 @@ public class PrintOnCsv {
                 safe(String.valueOf(r.getAffectedVersionsCount())),
                 safe(affectedJoined),
                 safe(r.getOpeningVersionName()),
-                safe(r.getOpeningVersionReleaseDate())
+                safe(r.getOpeningVersionReleaseDate()),
+                safe(r.getInjectionVersionName()),
+                safe(r.getInjectionVersionReleaseDate())
         );
     }
 
