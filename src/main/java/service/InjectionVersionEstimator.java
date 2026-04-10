@@ -41,9 +41,12 @@ public class InjectionVersionEstimator {
 
         ProjectVersion estimatedIv = versions.get(ivIndex);
 
+        // tutte le release dalla IV stimata fino alla FV esclusa
+        List<ProjectVersion> estimatedAffected = versions.subList(ivIndex, fvIndex);
+
         VersionRelation enriched = new VersionRelation(
                 record.getVersionRelation().getFixVersion(),
-                record.getVersionRelation().getAffectedVersions(),
+                estimatedAffected,
                 record.getVersionRelation().getOpeningVersion(),
                 estimatedIv
         );

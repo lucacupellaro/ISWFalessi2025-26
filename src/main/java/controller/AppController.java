@@ -17,7 +17,7 @@ import service.InjectionVersionEstimator;
 import service.ProportionCalculator;
 import service.VersionService;
 import util.ProgressLogger;
-
+import java.util.Comparator;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -153,17 +153,27 @@ public class AppController {
                                                  List<ProjectVersion> rawAffected,
                                                  List<ProjectVersion> allowedVersions,
                                                  LocalDate creationDate) {
+        // arricchisce fix con releaseDate ufficiale
         ProjectVersion enrichedFix = enrich(rawFix, allowedVersions);
 
+        // arricchisce tutte le affected con releaseDate ufficiale
+        // e le ordina cronologicamente per releaseDate
         List<ProjectVersion> enrichedAffected = rawAffected.stream()
                 .map(av -> enrich(av, allowedVersions))
+                .filter(av -> av.getReleaseDate() != null)
+                .sorted(Comparator.comparing(ProjectVersion::getReleaseDate))
                 .toList();
 
         ProjectVersion openingVersion = creationDate != null
                 ? versionService.findOpeningVersion(creationDate, allowedVersions)
                 : null;
 
-        return new VersionRelation(enrichedFix, enrichedAffected, openingVersion);
+        // IV nota: prima affected version (già ordinata cronologicamente)
+        ProjectVersion injectionVersion = enrichedAffected.isEmpty()
+                ? null
+                : enrichedAffected.get(0);
+
+        return new VersionRelation(enrichedFix, enrichedAffected, openingVersion, injectionVersion);
     }
 
     private ProjectVersion enrich(ProjectVersion raw, List<ProjectVersion> allowedVersions) {
