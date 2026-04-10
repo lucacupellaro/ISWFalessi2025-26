@@ -13,15 +13,23 @@ import domain.VersionRelation;
 import mapper.JiraIssueDto;
 import mapper.JiraMapper;
 import service.ConsistencyService;
+import service.InjectionVersionEstimator;
+import service.ProportionCalculator;
 import service.VersionService;
 import util.ProgressLogger;
-
+import java.util.Comparator;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
-
 import java.util.List;
 
+/**
+ * Orchestratore centrale (L2).
+ * Unico punto che conosce tutti i layer:
+ *   - chiama L0 (client/config) per dati grezzi
+ *   - delega a L1 (mapper/service) per trasformazione e validazione
+ *   - assembla gli oggetti L3 (domain) e li restituisce
+ * Nessuna logica di business vive qui: il controller coordina, non decide.
+ */
 public class AppController {
 
     private final AppConfig config;
@@ -30,6 +38,8 @@ public class AppController {
     private final ConsistencyService consistencyService;
     private final VersionService versionService;
     private final ObjectMapper objectMapper;
+    private final ProportionCalculator proportionCalculator;
+    private final InjectionVersionEstimator ivEstimator;
     private final ProgressLogger logger = new ProgressLogger();
 
     public AppController(String baseUrl, String username, String token) {
@@ -39,29 +49,48 @@ public class AppController {
         this.consistencyService = new ConsistencyService();
         this.versionService = new VersionService(new JiraVersionClient(baseUrl, username, token));
         this.objectMapper = new ObjectMapper();
+        this.proportionCalculator = new ProportionCalculator();
+        this.ivEstimator = new InjectionVersionEstimator();
     }
 
     public List<BugTicketRecord> run() {
         List<BugTicketRecord> results = new ArrayList<>();
+        List<ProjectVersion> allVersions = new ArrayList<>();
+
         for (ProjectConfig project : config.getProjects()) {
-            results.addAll(processProject(project));
+            List<ProjectVersion> versions = versionService.loadVersions(
+                    project.getKey(),
+                    config.getSettings().getMaxVersionsPercent()
+            );
+            allVersions.addAll(versions);
+            results.addAll(processProject(project, versions));
         }
+
+        results = new ArrayList<>(applyProportion(results, allVersions));
         logger.logGlobalDone(results.size());
         return results;
     }
 
-    private List<BugTicketRecord> processProject(ProjectConfig project) {
+    private List<BugTicketRecord> applyProportion(List<BugTicketRecord> records,
+                                                  List<ProjectVersion> versions) {
+        double p = proportionCalculator.computeP(records, versions);
+        logger.logProportionComputed(p);
+
+        return records.stream()
+                .map(r -> r.getVersionRelation().hasAffectedVersions()
+                        ? r
+                        : ivEstimator.estimateIv(r, p, versions))
+                .toList();
+    }
+
+    private List<BugTicketRecord> processProject(ProjectConfig project,
+                                                 List<ProjectVersion> allowedVersions) {
         List<BugTicketRecord> records = new ArrayList<>();
         int pageSize = config.getSettings().getPageSize();
         int startAt = 0;
         int fetched = 0;
 
         logger.logProjectStart(project.getKey());
-
-        List<ProjectVersion> allowedVersions = versionService.loadVersions(
-                project.getKey(),
-                config.getSettings().getMaxVersionsPercent()
-        );
         logger.logVersionsLoaded(project.getKey(), allowedVersions.size());
 
         while (true) {
@@ -82,22 +111,7 @@ public class AppController {
                 if (fetched >= maxAllowed) {
                     break;
                 }
-
-                BugTicket ticket = mapper.toBugTicket(dto);
-                VersionRelation versionRelation = mapper.toVersionRelation(dto);
-                VersionRelation enriched = enrichVersionRelation(
-                        versionRelation,
-                        allowedVersions,
-                        ticket.getCreationDate().toLocalDate()  // <-- passa la data di creazione
-                );
-                String reason = consistencyService.getDiscardReason(ticket, enriched, allowedVersions);
-                if (reason == null) {
-                    records.add(new BugTicketRecord(ticket, enriched,  project.getKey()));
-                    logger.logTicketValid(ticket.getId());
-                    fetched++;
-                } else {
-                    logger.logTicketDiscarded(ticket.getId(), reason);
-                }
+                fetched += processTicket(dto, allowedVersions, project.getKey(), records);
             }
 
             if (fetched >= maxAllowed || dtos.size() < pageSize) {
@@ -110,30 +124,66 @@ public class AppController {
         return records;
     }
 
+    private int processTicket(JiraIssueDto dto,
+                              List<ProjectVersion> allowedVersions,
+                              String projectKey,
+                              List<BugTicketRecord> records) {
+        BugTicket ticket = mapper.toBugTicket(dto);
+        ProjectVersion rawFix = mapper.toFixVersion(dto);
+        List<ProjectVersion> rawAffected = mapper.toAffectedVersions(dto);
 
-    //Il metodo verifica se le versioni del ticket coincidono (per nome) con quelle ufficiali del progetto e, se esiste una corrispondenza, sostituisce l’oggetto con quello ufficiale.
-    private VersionRelation enrichVersionRelation(VersionRelation versionRelation,
-                                                  List<ProjectVersion> allowedVersions,
-                                                  LocalDate creationDate) {
-        ProjectVersion enrichedFix = null;
-        if (versionRelation.getFixVersion() != null) {
-            String fixName = versionRelation.getFixVersion().getName();
-            enrichedFix = allowedVersions.stream()
-                    .filter(v -> v.getName().equals(fixName))
-                    .findFirst()
-                    .orElse(versionRelation.getFixVersion());
+        VersionRelation versionRelation = buildVersionRelation(
+                rawFix,
+                rawAffected,
+                allowedVersions,
+                ticket.getCreationDate() != null ? ticket.getCreationDate().toLocalDate() : null
+        );
+
+        String reason = consistencyService.getDiscardReason(ticket, versionRelation, allowedVersions);
+        if (reason == null) {
+            records.add(new BugTicketRecord(ticket, versionRelation, projectKey));
+            logger.logTicketValid(ticket.getId());
+            return 1;
         }
+        logger.logTicketDiscarded(ticket.getId(), reason);
+        return 0;
+    }
 
-        List<ProjectVersion> enrichedAffected = versionRelation.getAffectedVersions().stream()
-                .map(av -> allowedVersions.stream()
-                        .filter(v -> v.getName().equals(av.getName()))
-                        .findFirst()
-                        .orElse(av))
+    private VersionRelation buildVersionRelation(ProjectVersion rawFix,
+                                                 List<ProjectVersion> rawAffected,
+                                                 List<ProjectVersion> allowedVersions,
+                                                 LocalDate creationDate) {
+        // arricchisce fix con releaseDate ufficiale
+        ProjectVersion enrichedFix = enrich(rawFix, allowedVersions);
+
+        // arricchisce tutte le affected con releaseDate ufficiale
+        // e le ordina cronologicamente per releaseDate
+        List<ProjectVersion> enrichedAffected = rawAffected.stream()
+                .map(av -> enrich(av, allowedVersions))
+                .filter(av -> av.getReleaseDate() != null)
+                .sorted(Comparator.comparing(ProjectVersion::getReleaseDate))
                 .toList();
 
-        ProjectVersion openingVersion = versionService.findOpeningVersion(creationDate, allowedVersions);
+        ProjectVersion openingVersion = creationDate != null
+                ? versionService.findOpeningVersion(creationDate, allowedVersions)
+                : null;
 
-        return new VersionRelation(enrichedFix, enrichedAffected, openingVersion);
+        // IV nota: prima affected version (già ordinata cronologicamente)
+        ProjectVersion injectionVersion = enrichedAffected.isEmpty()
+                ? null
+                : enrichedAffected.get(0);
+
+        return new VersionRelation(enrichedFix, enrichedAffected, openingVersion, injectionVersion);
+    }
+
+    private ProjectVersion enrich(ProjectVersion raw, List<ProjectVersion> allowedVersions) {
+        if (raw == null) {
+            return null;
+        }
+        return allowedVersions.stream()
+                .filter(v -> v.getName().equals(raw.getName()))
+                .findFirst()
+                .orElse(raw);
     }
 
     private JsonNode parseJson(String json) {
