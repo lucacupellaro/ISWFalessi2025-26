@@ -1,16 +1,12 @@
-#in quetso modo vado a prendere tutti i ticket delle release escludedno l'ultimo 66%
 settings:
   maxTicketsPerProject: 0
   maxTicketsPercent: 100
   maxVersionsPerProject: 0
   maxVersionsPercent: 100
-  pageSize: 1000 #quanti ticket Jira ti restituisce in una singola chiamata HTTP.
+  pageSize: 1000
+
 
 projects:
- # - key: KAFKA
- #   jql: "issuetype = Bug AND status in (Closed, Resolved) AND resolution = Fixed"
- # - key: BOOKKEEPER
- #   jql: "issuetype = Bug AND status in (Closed, Resolved) AND resolution = Fixed"
-
   - key: ZOOKEEPER
-    jql: "issuetype = Bug AND status in (Closed, Resolved) AND resolution = Fixed"
+    repoName: zookeeper
+    jql: "project = ZOOKEEPER AND issuetype = Bug AND status in (Resolved, Closed)"

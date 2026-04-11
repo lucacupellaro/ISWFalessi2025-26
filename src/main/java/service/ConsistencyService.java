@@ -61,7 +61,7 @@ public class ConsistencyService {
             }
         }
 
-        // la fix version deve essere tra le versioni ammesse
+        // la fix version deve essere tra le versioni ammesse, se non lo è viene scartata
         String fixName = fix.getName();
         boolean fixInAllowed = allowedVersions.stream()
                 .anyMatch(v -> v.getName().equals(fixName));

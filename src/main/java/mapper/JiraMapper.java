@@ -22,6 +22,7 @@ public class JiraMapper {
     public BugTicket toBugTicket(JiraIssueDto dto) {
         return new BugTicket(
                 dto.getId(),
+                dto.getKey(),
                 parseDate(dto.getFields().getCreated()),
                 parseDate(dto.getFields().getResolutionDate())
         );

@@ -18,6 +18,10 @@ public class AppConfig {
 
     public AppConfig() {}
 
+    public String getGithubToken() { return settings.getGithubToken(); }
+
+
+
     public static AppConfig load() {
         ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
         try (InputStream is = AppConfig.class
@@ -60,6 +64,7 @@ public class AppConfig {
         private int maxVersionsPerProject;
         private int maxVersionsPercent;
         private int pageSize;
+        private String githubToken;
 
         public Settings() {}
 
@@ -77,5 +82,8 @@ public class AppConfig {
 
         public int getPageSize() { return pageSize; }
         public void setPageSize(int v) { this.pageSize = v; }
+
+        public String getGithubToken() { return githubToken; }
+        public void setGithubToken(String githubToken) { this.githubToken = githubToken; }
     }
 }

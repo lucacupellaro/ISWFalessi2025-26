@@ -12,6 +12,7 @@ import java.util.List;
 public class BugTicketRecord {
 
     private final String id;
+    private final String key;
     private final String projectKey;
     private final LocalDateTime creationDate;
     private final LocalDateTime resolutionDate;
@@ -19,6 +20,7 @@ public class BugTicketRecord {
 
     public BugTicketRecord(BugTicket ticket, VersionRelation versionRelation, String projectKey) {
         this.id = ticket.getId();
+        this.key = ticket.getKey();
         this.projectKey = projectKey;
         this.creationDate = ticket.getCreationDate();
         this.resolutionDate = ticket.getResolutionDate();
@@ -37,8 +39,10 @@ public class BugTicketRecord {
      * per creare un nuovo BugTicketRecord con IV aggiornata.
      */
     public BugTicket toBugTicket() {
-        return new BugTicket(id, creationDate, resolutionDate);
+        return new BugTicket(id, key, creationDate, resolutionDate);
     }
+
+    public String getTicketKey() { return key; }
 
     // --- Delegati fix version ---
 
@@ -89,6 +93,11 @@ public class BugTicketRecord {
         ProjectVersion iv = versionRelation.getInjectionVersion();
         return (iv != null && iv.getReleaseDate() != null)
                 ? iv.getReleaseDate().toString() : null;
+    }
+
+
+    public ProjectVersion getInjectionVersion() {
+        return versionRelation.getInjectionVersion();
     }
 
     // --- Accesso strutturato (solo per AppController e domain) ---
