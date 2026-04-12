@@ -29,6 +29,7 @@ public class GitHubCommitClient {
         this.logger = logger;
     }
 
+    //Scarica la lista completa di tutti i commit del repository, pagina per pagina. GitHub restituisce massimo 100 commit per chiamata, quindi cicla finché non riceve una pagina vuota.
     public List<JsonNode> fetchAllCommits(ProjectConfig projectConfig) throws IOException, InterruptedException {
         List<JsonNode> allCommits = new ArrayList<>();
         int page = 1;
@@ -66,6 +67,8 @@ public class GitHubCommitClient {
         return allCommits;
     }
 
+    //Dato lo SHA di un commit, scarica l'intero albero di file del repository a quel punto preciso della storia (?recursive=1). Filtra tenendo solo i file .java ed escludendo i path che contengono /test/.
+
     public List<String> fetchJavaClasses(String repoName, String sha)
             throws IOException, InterruptedException {
 
@@ -100,6 +103,7 @@ public class GitHubCommitClient {
         return classes;
     }
 
+   // Dato lo SHA di un commit specifico, scarica il dettaglio di quel singolo commit e restituisce la lista dei file .java modificati (escludendo i test). A differenza di fetchJavaClasses che guarda l'intero tree, questo guarda solo le diff
     public List<String> fetchTouchedPaths(String repoName, String sha)
             throws IOException, InterruptedException {
 

@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 
 public class CsvTicketReader {
 
-    private static final String CSV_PATH = "file/TicketRelease.csv";
+    private static final String CSV_PATH = "src/main/java/file/TicketRelease.csv";
 
     public List<BugTicketRecord> read() throws IOException {
         List<BugTicketRecord> records = new ArrayList<>();

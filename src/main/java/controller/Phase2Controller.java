@@ -47,45 +47,23 @@ public class Phase2Controller {
         String projectKey = projectConfig.getKey();
         String repoName = projectConfig.getRepoName();
 
-        // step 1 — scarica e finestra le release
-        logger.logInfo("Scarico release reali da Jira per " + projectKey + "...");
+        logger.logInfo("1 Scarico release reali da Jira per " + projectKey + "e applico il taglio..");
         List<ProjectVersion> windowedReleases = versionService
                 .loadVersions(projectKey, windowPercent);
         logger.logInfo("Release nella finestra: " + windowedReleases.size());
 
-        // step 2 — scarica tutti i commit
         logger.logInfo("Scarico commit da GitHub per " + repoName + "...");
         List<GitCommit> commits = commitMapper.mapCommits(
                 gitHubCommitClient.fetchAllCommits(projectConfig));
-
-// LOG DI CONTROLLO — da rimuovere dopo il debug
         logger.logInfo("Totale commit scaricati: " + commits.size());
-        commits.stream()
-                .limit(5)
-                .forEach(c -> logger.logInfo("Commit msg: " +
-                        c.getMessage().substring(0, Math.min(80, c.getMessage().length()))));
 
-// data del commit più vecchio e più recente
-        commits.stream()
-                .min((a, b) -> a.getDate().compareTo(b.getDate()))
-                .ifPresent(c -> logger.logInfo("Commit più vecchio: " + c.getDate() + " — " +
-                        c.getMessage().substring(0, Math.min(50, c.getMessage().length()))));
-        commits.stream()
-                .max((a, b) -> a.getDate().compareTo(b.getDate()))
-                .ifPresent(c -> logger.logInfo("Commit più recente: " + c.getDate() + " — " +
-                        c.getMessage().substring(0, Math.min(50, c.getMessage().length()))));
-
-        long countWithKey = commits.stream()
-                .filter(c -> c.getMessage().contains("ZOOKEEPER-"))
-                .count();
-        logger.logInfo("Commit con ZOOKEEPER- nel messaggio: " + countWithKey + "/" + commits.size());
-        // step 3 — assegna ogni commit alla sua release
+        //ogni commit viene assegnato ala sua Realese
         for (GitCommit commit : commits) {
             ProjectVersion release = assignCommitToRelease(windowedReleases, commit.getDate());
             commit.setRelease(release);
         }
 
-        // step 4 — per ogni release estrai le classi
+        //ricostruisce le classi Java esistenti in quella release
         logger.logInfo("Estrazione classi per release...");
         List<JavaClass> allClasses = new ArrayList<>();
         for (ProjectVersion release : windowedReleases) {
@@ -95,12 +73,12 @@ public class Phase2Controller {
         }
         logger.logInfo("Totale classi estratte: " + allClasses.size());
 
-        // step 5 — labeling lazy: popola touchedPaths solo per commit con ticketId
         logger.logInfo("Avvio labeling...");
         List<BugTicketRecord> projectTickets = tickets.stream()
                 .filter(t -> t.getProjectKey().equals(projectKey))
                 .toList();
 
+        //per ogni ticket,  trova i commit associati (ticketKey nel messaggio)
         for (BugTicketRecord ticket : projectTickets) {
 
             if (ticket.getInjectionVersion() == null) {
@@ -108,17 +86,17 @@ public class Phase2Controller {
                 continue;
             }
 
-            logger.logInfo("Cerco commit per ticketKey: " + ticket.getTicketKey() + " id: " + ticket.getId());
-
+            //prende solo i commit che hanno nel messaggio il ticket considerato
             List<GitCommit> relevantCommits = commits.stream()
                     .filter(c -> c.getMessage().contains(ticket.getTicketKey()))
                     .toList();
 
             if (relevantCommits.isEmpty()) {
-                logger.logWarning("Nessun commit trovato per ticket " + ticket.getId());
+                logger.logWarning("Nessun commit trovato per ticket " + ticket.getTicketKey());
                 continue;
             }
 
+            //touchedPaths è la lista dei path delle classi Java modificate da quel commit
             for (GitCommit commit : relevantCommits) {
                 if (commit.getTouchedPaths() == null) {
                     List<String> paths = gitHubCommitClient
@@ -131,14 +109,12 @@ public class Phase2Controller {
                     allClasses,
                     relevantCommits,
                     windowedReleases,
-                    ticket.getTicketKey(),
                     ticket.getInjectionVersion(),
                     ticket.getVersionRelation().getFixVersion());
         }
 
         logger.logInfo("Labeling completato per " + projectKey);
 
-        // step 6 — costruisci ClassRecord e scrivi CSV
         logger.logInfo("Scrittura dataset...");
         List<ClassRecord> records = allClasses.stream()
                 .map(c -> new ClassRecord(
@@ -152,6 +128,7 @@ public class Phase2Controller {
         logger.logInfo("Dataset scritto: " + records.size() + " righe");
     }
 
+    //assegno i commit alla sua release
     private ProjectVersion assignCommitToRelease(List<ProjectVersion> releases,
                                                  LocalDate commitDate) {
         for (int i = 0; i < releases.size(); i++) {

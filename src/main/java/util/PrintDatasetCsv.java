@@ -12,7 +12,7 @@ import java.util.List;
 
 public class PrintDatasetCsv {
 
-    private static final String OUTPUT_PATH = "file/Dataset.csv";
+    private static final String OUTPUT_PATH = "src/main/java/file/DatasetClassiRelease.csv";
     private static final String HEADER = "release,className,loc,buggy";
     private final ProgressLogger logger = new ProgressLogger();
 

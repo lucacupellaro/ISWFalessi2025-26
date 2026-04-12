@@ -20,7 +20,7 @@ import java.util.List;
 
 public class Main {
 
-    private static final String CSV_PATH = "file/TicketRelease.csv";
+    private static final String CSV_PATH = "src/main/java/file/TicketRelease.csv";
 
     public static void main(String[] args) throws Exception {
 

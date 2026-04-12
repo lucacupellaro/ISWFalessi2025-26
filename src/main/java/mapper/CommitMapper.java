@@ -15,6 +15,7 @@ public class CommitMapper {
 
     private final ProgressLogger logger = new ProgressLogger();
 
+    //itera la lista grezza dei commit
     public List<GitCommit> mapCommits(List<JsonNode> rawCommits) {
         List<GitCommit> commits = new ArrayList<>();
 
@@ -27,7 +28,7 @@ public class CommitMapper {
 
         return commits;
     }
-
+//lavora sul singolo commit. Estrae tre campi dal JSON di GitHub: sha (identificatore univoco del commit), message (il testo del messaggio, dove cercheremo ZOOKEEPER-1234) e date (la data dell'autore, che usa per assegnare il commit alla release corretta).
     private GitCommit mapSingle(JsonNode node) {
         try {
             String sha = node.path("sha").asText(null);

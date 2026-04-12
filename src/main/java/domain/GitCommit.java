@@ -10,7 +10,7 @@ public class GitCommit {
     private final String sha;
     private final String message;
     private final LocalDate date;
-    private List<String> touchedPaths;
+    private List<String> touchedPaths;  //lista delle classi toccate da quel commit
     private ProjectVersion release;
 
     public GitCommit(String sha, String message, LocalDate date) {

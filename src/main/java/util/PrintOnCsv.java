@@ -15,7 +15,7 @@ import java.util.List;
  */
 public class PrintOnCsv {
 
-    private static final String FILE_NAME = "TicketRelease.csv";
+    private static final String FILE_NAME = "src/main/java/file/TicketRelease.csv";
     private static final String SEPARATOR = ",";
     private static final String HEADER = String.join(SEPARATOR,
             "projectKey",

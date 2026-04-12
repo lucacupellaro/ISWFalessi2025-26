@@ -1,7 +1,5 @@
 package service;
 
-
-
 import domain.BugTicketRecord;
 import domain.ProjectVersion;
 import domain.VersionRelation;
@@ -20,6 +18,7 @@ public class InjectionVersionEstimator {
     /**
      * Restituisce un nuovo BugTicketRecord con la IV stimata dentro VersionRelation.
      * Se FV o OV non sono trovati nella lista, restituisce il record invariato.
+     * Se la IV stimata risulta successiva alla FV, restituisce il record invariato.
      *
      * @param record   ticket senza affected versions
      * @param p        valore di P calcolato da ProportionCalculator
@@ -40,12 +39,21 @@ public class InjectionVersionEstimator {
         ivIndex = Math.max(0, Math.min(ivIndex, versions.size() - 1));
 
         ProjectVersion estimatedIv = versions.get(ivIndex);
+        ProjectVersion fix = record.getVersionRelation().getFixVersion();
 
-        // tutte le release dalla IV stimata fino alla FV esclusa
+        if (estimatedIv.getReleaseDate().isAfter(fix.getReleaseDate())) {
+            return record;
+        }
+
+        ProjectVersion ov = record.getVersionRelation().getOpeningVersion();
+        if (ov != null && estimatedIv.getReleaseDate().isAfter(ov.getReleaseDate())) {
+            return record;
+        }
+
         List<ProjectVersion> estimatedAffected = versions.subList(ivIndex, fvIndex);
 
         VersionRelation enriched = new VersionRelation(
-                record.getVersionRelation().getFixVersion(),
+                fix,
                 estimatedAffected,
                 record.getVersionRelation().getOpeningVersion(),
                 estimatedIv

@@ -69,6 +69,20 @@ public class ConsistencyService {
             return "fixVersion '" + fixName + "' non è nelle versioni ammesse";
         }
 
+        //Il controllo verifica che la injection version sia stata rilasciata prima della fix version E non puo stare dopo la OV
+        ProjectVersion iv = versionRelation.getInjectionVersion();
+        if (iv != null && iv.getReleaseDate() != null) {
+            if (iv.getReleaseDate().isAfter(fix.getReleaseDate())) {
+                return "injectionVersion '" + iv.getName()
+                        + "' rilasciata dopo la fixVersion '" + fix.getName() + "'";
+            }
+            ProjectVersion ov = versionRelation.getOpeningVersion();
+            if (ov != null && iv.getReleaseDate().isAfter(ov.getReleaseDate())) {
+                return "injectionVersion '" + iv.getName()
+                        + "' rilasciata dopo la openingVersion '" + ov.getName() + "'";
+            }
+        }
+
         return null;
     }
 }
