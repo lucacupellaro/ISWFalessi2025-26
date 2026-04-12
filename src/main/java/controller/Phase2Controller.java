@@ -19,6 +19,7 @@ public class Phase2Controller {
     private final GitHubCommitClient gitHubCommitClient;
     private final CommitMapper commitMapper;
     private final ClassExtractorService classExtractorService;
+    private final MetricsServices metricsServices;
     private final LabelingService labelingService;
     private final PrintDatasetCsv printDatasetCsv;
     private final ProgressLogger logger;
@@ -27,6 +28,7 @@ public class Phase2Controller {
                             GitHubCommitClient gitHubCommitClient,
                             CommitMapper commitMapper,
                             ClassExtractorService classExtractorService,
+                            MetricsServices metricsServices,
                             LabelingService labelingService,
                             PrintDatasetCsv printDatasetCsv,
                             ProgressLogger logger) {
@@ -34,6 +36,7 @@ public class Phase2Controller {
         this.gitHubCommitClient = gitHubCommitClient;
         this.commitMapper = commitMapper;
         this.classExtractorService = classExtractorService;
+        this.metricsServices = metricsServices;
         this.labelingService = labelingService;
         this.printDatasetCsv = printDatasetCsv;
         this.logger = logger;
@@ -47,7 +50,8 @@ public class Phase2Controller {
         String projectKey = projectConfig.getKey();
         String repoName = projectConfig.getRepoName();
 
-        logger.logInfo("1 Scarico release reali da Jira per " + projectKey + "e applico il taglio..");
+        // scarica le release reali da Jira e applica il taglio al windowPercent%
+        logger.logInfo("Scarico release reali da Jira per " + projectKey + " e applico il taglio...");
         List<ProjectVersion> windowedReleases = versionService
                 .loadVersions(projectKey, windowPercent);
         logger.logInfo("Release nella finestra: " + windowedReleases.size());
@@ -57,13 +61,13 @@ public class Phase2Controller {
                 gitHubCommitClient.fetchAllCommits(projectConfig));
         logger.logInfo("Totale commit scaricati: " + commits.size());
 
-        //ogni commit viene assegnato ala sua Realese
+        // ogni commit viene assegnato alla sua release
         for (GitCommit commit : commits) {
             ProjectVersion release = assignCommitToRelease(windowedReleases, commit.getDate());
             commit.setRelease(release);
         }
 
-        //ricostruisce le classi Java esistenti in quella release
+        // ricostruisce le classi Java esistenti in quella release
         logger.logInfo("Estrazione classi per release...");
         List<JavaClass> allClasses = new ArrayList<>();
         for (ProjectVersion release : windowedReleases) {
@@ -73,12 +77,26 @@ public class Phase2Controller {
         }
         logger.logInfo("Totale classi estratte: " + allClasses.size());
 
+        // scarica touchedPaths e fileDiffs per ogni commit (serve sia alle metriche sia al labeling)
+        logger.logInfo("Scarico touched paths per ogni commit...");
+        for (GitCommit commit : commits) {
+            if (commit.getTouchedPaths() == null) {
+                gitHubCommitClient.fetchTouchedPathsAndDiffs(repoName, commit);
+            }
+        }
+        logger.logInfo("Touched paths scaricati.");
+
+        // calcolo metriche per ogni classe
+        logger.logInfo("Calcolo metriche...");
+        metricsServices.computeAllMetrics(allClasses, commits, repoName);
+        logger.logInfo("Metriche calcolate.");
+
         logger.logInfo("Avvio labeling...");
         List<BugTicketRecord> projectTickets = tickets.stream()
                 .filter(t -> t.getProjectKey().equals(projectKey))
                 .toList();
 
-        //per ogni ticket,  trova i commit associati (ticketKey nel messaggio)
+        // per ogni ticket, trova i commit associati (ticketKey nel messaggio)
         for (BugTicketRecord ticket : projectTickets) {
 
             if (ticket.getInjectionVersion() == null) {
@@ -86,7 +104,7 @@ public class Phase2Controller {
                 continue;
             }
 
-            //prende solo i commit che hanno nel messaggio il ticket considerato
+            // prende solo i commit che hanno nel messaggio il ticket considerato
             List<GitCommit> relevantCommits = commits.stream()
                     .filter(c -> c.getMessage().contains(ticket.getTicketKey()))
                     .toList();
@@ -96,12 +114,11 @@ public class Phase2Controller {
                 continue;
             }
 
-            //touchedPaths è la lista dei path delle classi Java modificate da quel commit
+            // touchedPaths è la lista dei path delle classi Java modificate da quel commit
             for (GitCommit commit : relevantCommits) {
                 if (commit.getTouchedPaths() == null) {
-                    List<String> paths = gitHubCommitClient
-                            .fetchTouchedPaths(repoName, commit.getSha());
-                    commit.setTouchedPaths(paths);
+                    gitHubCommitClient
+                            .fetchTouchedPathsAndDiffs(repoName, commit);
                 }
             }
 
@@ -121,6 +138,17 @@ public class Phase2Controller {
                         c.getRelease(),
                         c.getName(),
                         c.getLoc(),
+                        c.getCommentLines(),
+                        c.getNRevisions(),
+                        c.getNAuth(),
+                        c.getNFix(),
+                        c.getLocAdded(),
+                        c.getMaxLocAdded(),
+                        c.getAvgLocAdded(),
+                        c.getChurn(),
+                        c.getMaxChurn(),
+                        c.getAvgChurn(),
+                        c.getLocTouched(),
                         c.isBuggy()))
                 .toList();
 
@@ -128,7 +156,7 @@ public class Phase2Controller {
         logger.logInfo("Dataset scritto: " + records.size() + " righe");
     }
 
-    //assegno i commit alla sua release
+    // assegno il commit alla sua release in base alla data
     private ProjectVersion assignCommitToRelease(List<ProjectVersion> releases,
                                                  LocalDate commitDate) {
         for (int i = 0; i < releases.size(); i++) {

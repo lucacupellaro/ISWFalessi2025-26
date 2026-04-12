@@ -28,12 +28,14 @@ public class CommitMapper {
 
         return commits;
     }
-//lavora sul singolo commit. Estrae tre campi dal JSON di GitHub: sha (identificatore univoco del commit), message (il testo del messaggio, dove cercheremo ZOOKEEPER-1234) e date (la data dell'autore, che usa per assegnare il commit alla release corretta).
+
+    //lavora sul singolo commit. Estrae tre campi dal JSON di GitHub: sha (identificatore univoco del commit), message (il testo del messaggio, dove cercheremo ZOOKEEPER-1234) e date (la data dell'autore, che usa per assegnare il commit alla release corretta).
     private GitCommit mapSingle(JsonNode node) {
         try {
             String sha = node.path("sha").asText(null);
             String message = node.path("commit").path("message").asText(null);
             String dateStr = node.path("commit").path("author").path("date").asText(null);
+            String author = node.path("commit").path("author").path("name").asText(null);
 
             if (sha == null || message == null || dateStr == null) {
                 logger.logWarning("Commit scartato: campo mancante");
@@ -41,11 +43,15 @@ public class CommitMapper {
             }
 
             LocalDate date = LocalDate.parse(dateStr.substring(0, 10));
-            return new GitCommit(sha, message, date);
+            GitCommit commit = new GitCommit(sha, message, date);
+            commit.setAuthor(author);
+            return commit;
 
         } catch (DateTimeParseException e) {
             logger.logWarning("Commit scartato: data non parsabile");
             return null;
         }
     }
+
 }
+

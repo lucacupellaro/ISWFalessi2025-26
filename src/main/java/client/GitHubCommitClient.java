@@ -10,8 +10,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import domain.GitCommit;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class GitHubCommitClient {
 
@@ -103,12 +106,13 @@ public class GitHubCommitClient {
         return classes;
     }
 
-   // Dato lo SHA di un commit specifico, scarica il dettaglio di quel singolo commit e restituisce la lista dei file .java modificati (escludendo i test). A differenza di fetchJavaClasses che guarda l'intero tree, questo guarda solo le diff
-    public List<String> fetchTouchedPaths(String repoName, String sha)
+   // Dato lo SHA di un commit specifico, scarica il dettaglio di quel singolo commit e restituisce la lista dei file .java modificati (escludendo i test).
+   // Salva anche le diff (additions/deletions) per ogni file nel GitCommit, così non serve richiamare l'endpoint per le metriche LOC.
+    public void fetchTouchedPathsAndDiffs(String repoName, GitCommit commit)
             throws IOException, InterruptedException {
 
         String url = String.format("https://api.github.com/repos/apache/%s/commits/%s",
-                repoName, sha);
+                repoName, commit.getSha());
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
@@ -122,19 +126,25 @@ public class GitHubCommitClient {
 
         if (response.statusCode() != 200) {
             logger.logWarning("GitHub commit detail API error: " + response.statusCode());
-            return new ArrayList<>();
+            commit.setTouchedPaths(new ArrayList<>());
+            return;
         }
 
         JsonNode files = MAPPER.readTree(response.body()).path("files");
         List<String> paths = new ArrayList<>();
+        Map<String, List<Integer>> diffs = new java.util.HashMap<>();
 
         files.forEach(file -> {
             String path = file.path("filename").asText("");
             if (path.endsWith(".java") && !path.contains("/test/")) {
                 paths.add(path);
+                int added   = file.path("additions").asInt(0);
+                int removed = file.path("deletions").asInt(0);
+                diffs.put(path, List.of(added, removed));
             }
         });
 
-        return paths;
+        commit.setTouchedPaths(paths);
+        commit.setFileDiffs(diffs);
     }
 }

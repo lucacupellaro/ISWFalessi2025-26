@@ -9,6 +9,7 @@ import domain.BugTicketRecord;
 import mapper.CommitMapper;
 import service.ClassExtractorService;
 import service.LabelingService;
+import service.MetricsServices;
 import service.VersionService;
 import util.CsvTicketReader;
 import util.PrintDatasetCsv;
@@ -23,7 +24,6 @@ public class Main {
     private static final String CSV_PATH = "src/main/java/file/TicketRelease.csv";
 
     public static void main(String[] args) throws Exception {
-
         AppConfig config = AppConfig.load();
         int percent = config.getSettings().getMaxVersionsPercent();
 
@@ -76,7 +76,7 @@ public class Main {
         System.out.println("Avvio phase2...");
 
         ProgressLogger logger = new ProgressLogger();
-        String githubToken = config.getGithubToken();
+        String githubToken = config.getSettings().getGithubToken();
 
         GitHubCommitClient gitHubCommitClient = new GitHubCommitClient(githubToken, logger);
         JiraVersionClient jiraVersionClient = new JiraVersionClient(
@@ -84,6 +84,7 @@ public class Main {
         VersionService versionService = new VersionService(jiraVersionClient);
         CommitMapper commitMapper = new CommitMapper();
         ClassExtractorService classExtractorService = new ClassExtractorService(gitHubCommitClient, logger);
+        MetricsServices metricsServices = new MetricsServices(gitHubCommitClient, logger);
         LabelingService labelingService = new LabelingService();
         PrintDatasetCsv printDatasetCsv = new PrintDatasetCsv();
 
@@ -92,13 +93,17 @@ public class Main {
 
         Phase2Controller controller = new Phase2Controller(
                 versionService, gitHubCommitClient, commitMapper,
-                classExtractorService, labelingService, printDatasetCsv, logger);
+                classExtractorService, metricsServices, labelingService,
+                printDatasetCsv, logger);
+
+        int windowPercent = config.getSettings().getMaxVersionsPercent();
 
         config.getProjects().forEach(project -> {
             try {
-                controller.run(project, tickets, config.getSettings().getMaxVersionsPercent());
+                controller.run(project, tickets, windowPercent);
             } catch (Exception e) {
-                logger.logWarning("Errore phase2 per progetto " + project.getKey() + ": " + e.getMessage());
+                logger.logWarning("Errore phase2 per progetto "
+                        + project.getKey() + ": " + e.getMessage());
             }
         });
     }
