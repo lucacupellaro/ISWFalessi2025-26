@@ -96,6 +96,7 @@ public class Main {
                 classExtractorService, metricsServices, labelingService,
                 printDatasetCsv, logger);
 
+        //paramtro preso da projects.yml
         int windowPercent = config.getSettings().getMaxVersionsPercent();
 
         config.getProjects().forEach(project -> {

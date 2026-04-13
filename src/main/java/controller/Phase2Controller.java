@@ -51,7 +51,7 @@ public class Phase2Controller {
         String repoName = projectConfig.getRepoName();
 
         // scarica le release reali da Jira e applica il taglio al windowPercent%
-        logger.logInfo("Scarico release reali da Jira per " + projectKey + " e applico il taglio...");
+        logger.logInfo("Scarico release reali da Jira per " + projectKey + " e applico il taglio al .."+windowPercent+"%");
         List<ProjectVersion> windowedReleases = versionService
                 .loadVersions(projectKey, windowPercent);
         logger.logInfo("Release nella finestra: " + windowedReleases.size());
@@ -67,18 +67,8 @@ public class Phase2Controller {
             commit.setRelease(release);
         }
 
-        // ricostruisce le classi Java esistenti in quella release
-        logger.logInfo("Estrazione classi per release...");
-        List<JavaClass> allClasses = new ArrayList<>();
-        for (ProjectVersion release : windowedReleases) {
-            List<JavaClass> classes = classExtractorService
-                    .extractClassesForRelease(release, commits, repoName);
-            allClasses.addAll(classes);
-        }
-        logger.logInfo("Totale classi estratte: " + allClasses.size());
-
-        // scarica touchedPaths e fileDiffs per ogni commit (serve sia alle metriche sia al labeling)
-        logger.logInfo("Scarico touched paths per ogni commit...");
+        // scarica touchedPaths e fileDiffs per ogni commit
+        logger.logInfo("Scarico touched paths e diffs per ogni commit...");
         for (GitCommit commit : commits) {
             if (commit.getTouchedPaths() == null) {
                 gitHubCommitClient.fetchTouchedPathsAndDiffs(repoName, commit);
@@ -86,17 +76,34 @@ public class Phase2Controller {
         }
         logger.logInfo("Touched paths scaricati.");
 
-        // calcolo metriche per ogni classe
-        logger.logInfo("Calcolo metriche...");
-        metricsServices.computeAllMetrics(allClasses, commits, repoName);
-        logger.logInfo("Metriche calcolate.");
+        // estrazione classi + calcolo metriche per release
+        logger.logInfo("Estrazione classi e calcolo metriche per release...");
+        List<JavaClass> allClasses = new ArrayList<>();
+        for (ProjectVersion release : windowedReleases) {
+            List<JavaClass> classes = classExtractorService
+                    .extractClassesForRelease(release, commits, repoName);
 
+            // trova l'ultimo SHA di questa release per scaricare il content
+            String lastSha = commits.stream()
+                    .filter(c -> release.equals(c.getRelease()))
+                    .max((a, b) -> a.getDate().compareTo(b.getDate()))
+                    .map(GitCommit::getSha)
+                    .orElse(null);
+
+            if (lastSha != null) {
+                metricsServices.computeAllMetrics(classes, commits, repoName, lastSha);
+            }
+
+            allClasses.addAll(classes);
+        }
+        logger.logInfo("Totale classi estratte: " + allClasses.size());
+
+        // labeling
         logger.logInfo("Avvio labeling...");
         List<BugTicketRecord> projectTickets = tickets.stream()
                 .filter(t -> t.getProjectKey().equals(projectKey))
                 .toList();
 
-        // per ogni ticket, trova i commit associati (ticketKey nel messaggio)
         for (BugTicketRecord ticket : projectTickets) {
 
             if (ticket.getInjectionVersion() == null) {
@@ -117,8 +124,7 @@ public class Phase2Controller {
             // touchedPaths è la lista dei path delle classi Java modificate da quel commit
             for (GitCommit commit : relevantCommits) {
                 if (commit.getTouchedPaths() == null) {
-                    gitHubCommitClient
-                            .fetchTouchedPathsAndDiffs(repoName, commit);
+                    gitHubCommitClient.fetchTouchedPathsAndDiffs(repoName, commit);
                 }
             }
 

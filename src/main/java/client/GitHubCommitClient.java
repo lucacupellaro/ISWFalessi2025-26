@@ -147,4 +147,34 @@ public class GitHubCommitClient {
         commit.setTouchedPaths(paths);
         commit.setFileDiffs(diffs);
     }
+
+    public String fetchFileContent(String repoName, String path, String sha)
+            throws IOException, InterruptedException {
+
+        String url = String.format(
+                "https://api.github.com/repos/apache/%s/contents/%s?ref=%s",
+                repoName, path, sha);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Authorization", "Bearer " + token)
+                .header("Accept", "application/vnd.github+json")
+                .GET()
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request,
+                HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() != 200) {
+            logger.logWarning("GitHub content API error: " + response.statusCode());
+            return null;
+        }
+
+        JsonNode node = MAPPER.readTree(response.body());
+        String encoded = node.path("content").asText(null);
+        if (encoded == null) return null;
+
+        encoded = encoded.replace("\n", "");
+        return new String(java.util.Base64.getDecoder().decode(encoded));
+    }
 }

@@ -22,12 +22,23 @@ public class MetricsServices {
 
     public void computeAllMetrics(List<JavaClass> classes,
                                   List<GitCommit> commits,
-                                  String repoName) throws IOException, InterruptedException {
+                                  String repoName,
+                                  String lastSha) throws IOException, InterruptedException {
+        fetchContent(classes, repoName, lastSha);
         computeLoc(classes);
         computeCommentLines(classes);
         computeNRevisions(classes, commits);
         computeNAuth(classes, commits, repoName);
         computeLocMetrics(classes, commits, repoName);
+    }
+
+    private void fetchContent(List<JavaClass> classes, String repoName,
+                              String sha) throws IOException, InterruptedException {
+        for (JavaClass javaClass : classes) {
+            String content = gitHubCommitClient.fetchFileContent(
+                    repoName, javaClass.getPath(), sha);
+            javaClass.setContent(content);
+        }
     }
 
     // 1. LOC — conta le righe totali del file
