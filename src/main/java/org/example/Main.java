@@ -84,7 +84,7 @@ public class Main {
         VersionService versionService = new VersionService(jiraVersionClient);
         CommitMapper commitMapper = new CommitMapper();
         ClassExtractorService classExtractorService = new ClassExtractorService(gitHubCommitClient, logger);
-        MetricsServices metricsServices = new MetricsServices(gitHubCommitClient, logger);
+        MetricsServices metricsServices = new MetricsServices(logger);
         LabelingService labelingService = new LabelingService();
         PrintDatasetCsv printDatasetCsv = new PrintDatasetCsv();
 
@@ -96,7 +96,7 @@ public class Main {
                 classExtractorService, metricsServices, labelingService,
                 printDatasetCsv, logger);
 
-        //paramtro preso da projects.yml
+        //parametro preso da projects.yml
         int windowPercent = config.getSettings().getMaxVersionsPercent();
 
         config.getProjects().forEach(project -> {

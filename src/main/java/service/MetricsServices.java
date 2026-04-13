@@ -1,75 +1,48 @@
 package service;
 
-
-
-import client.GitHubCommitClient;
 import domain.GitCommit;
 import domain.JavaClass;
 import util.ProgressLogger;
 
-import java.io.IOException;
-import java.util.*;;
+import java.util.*;
 
 public class MetricsServices {
 
-    private final GitHubCommitClient gitHubCommitClient;
     private final ProgressLogger logger;
 
-    public MetricsServices(GitHubCommitClient gitHubCommitClient, ProgressLogger logger) {
-        this.gitHubCommitClient = gitHubCommitClient;
+    public MetricsServices(ProgressLogger logger) {
         this.logger = logger;
     }
 
     public void computeAllMetrics(List<JavaClass> classes,
                                   List<GitCommit> commits,
-                                  String repoName,
-                                  String lastSha) throws IOException, InterruptedException {
-        fetchContent(classes, repoName, lastSha);
-        computeLoc(classes);
-        computeCommentLines(classes);
+                                  String repoName) {
+        computeLocFromDiffs(classes, commits);
         computeNRevisions(classes, commits);
-        computeNAuth(classes, commits, repoName);
-        computeLocMetrics(classes, commits, repoName);
+        computeNAuth(classes, commits);
+        computeLocMetrics(classes, commits);
     }
 
-    private void fetchContent(List<JavaClass> classes, String repoName,
-                              String sha) throws IOException, InterruptedException {
+    // LOC stimato come somma cumulativa di (additions - deletions) su tutti i commit della storia del file
+    private void computeLocFromDiffs(List<JavaClass> classes, List<GitCommit> commits) {
+        Map<String, Integer> locPerPath = new HashMap<>();
+
+        for (GitCommit commit : commits) {
+            if (commit.getFileDiffs() == null) continue;
+            commit.getFileDiffs().forEach((path, diff) -> {
+                int net = diff.get(0) - diff.get(1); // additions - deletions
+                locPerPath.merge(path, net, Integer::sum);
+            });
+        }
+
         for (JavaClass javaClass : classes) {
-            String content = gitHubCommitClient.fetchFileContent(
-                    repoName, javaClass.getPath(), sha);
-            javaClass.setContent(content);
+            int estimatedLoc = Math.max(0, locPerPath.getOrDefault(javaClass.getPath(), 0));
+            javaClass.setLoc(estimatedLoc);
+            javaClass.setCommentLines(0);
         }
     }
 
-    // 1. LOC — conta le righe totali del file
-    private void computeLoc(List<JavaClass> classes) {
-        for (JavaClass javaClass : classes) {
-            if (javaClass.getContent() == null) continue;
-            String[] lines = javaClass.getContent().split("\r\n|\r|\n");
-            javaClass.setLoc(lines.length);
-        }
-    }
-
-    // 2. Comment Lines — conta le righe di commento
-    private void computeCommentLines(List<JavaClass> classes) {
-        for (JavaClass javaClass : classes) {
-            if (javaClass.getContent() == null) continue;
-            int count = 0;
-            String[] lines = javaClass.getContent().split("\r\n|\r|\n");
-            for (String line : lines) {
-                String trim = line.trim();
-                if (trim.startsWith("//") || trim.startsWith("*")
-                        || trim.startsWith("/*") || trim.startsWith("*/")) {
-                    count++;
-                }
-            }
-            javaClass.setCommentLines(count);
-        }
-    }
-
-    // 3. NR — numero di commit che hanno toccato la classe
-    // Costruisce una mappa path → count in un singolo passaggio sui commit (O(commit)),
-    // poi assegna i valori alle classi (O(classi)).
+    // NR — numero di commit che hanno toccato la classe
     private void computeNRevisions(List<JavaClass> classes, List<GitCommit> commits) {
         Map<String, Integer> revisionsPerPath = new HashMap<>();
 
@@ -85,12 +58,8 @@ public class MetricsServices {
         }
     }
 
-    // 4. NAuth — numero di autori distinti che hanno toccato la classe
-    // Costruisce una mappa path → Set<author> in un singolo passaggio sui commit (O(commit)),
-    // poi assegna i valori alle classi (O(classi)).
-    private void computeNAuth(List<JavaClass> classes,
-                              List<GitCommit> commits,
-                              String repoName) {
+    // NAuth — numero di autori distinti che hanno toccato la classe
+    private void computeNAuth(List<JavaClass> classes, List<GitCommit> commits) {
         Map<String, Set<String>> authorsPerPath = new HashMap<>();
 
         for (GitCommit commit : commits) {
@@ -107,11 +76,9 @@ public class MetricsServices {
         }
     }
 
-    // 5-11. LOC Added, Churn, LOC Touched, Max/Avg LOC Added, Max/Avg Churn
+    // LOC Added, Churn, LOC Touched, Max/Avg LOC Added, Max/Avg Churn
     // Legge le diff già scaricate da fetchTouchedPathsAndDiffs, senza fare nuove chiamate HTTP.
-    private void computeLocMetrics(List<JavaClass> classes,
-                                   List<GitCommit> commits,
-                                   String repoName) {
+    private void computeLocMetrics(List<JavaClass> classes, List<GitCommit> commits) {
         for (JavaClass javaClass : classes) {
 
             List<GitCommit> classCommits = commits.stream()
@@ -135,9 +102,8 @@ public class MetricsServices {
                 javaClass.addLocTouched(touched);
             }
 
-            List<Integer> addedList = javaClass.getLocAddedList();
-            List<Integer> churnList = computeChurnList(
-                    javaClass.getLocAddedList(), javaClass.getLocRemovedList());
+            List<Integer> addedList  = javaClass.getLocAddedList();
+            List<Integer> churnList  = computeChurnList(addedList, javaClass.getLocRemovedList());
 
             javaClass.setMaxLocAdded(getMax(addedList));
             javaClass.setMaxChurn(getMax(churnList));

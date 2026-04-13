@@ -83,16 +83,7 @@ public class Phase2Controller {
             List<JavaClass> classes = classExtractorService
                     .extractClassesForRelease(release, commits, repoName);
 
-            // trova l'ultimo SHA di questa release per scaricare il content
-            String lastSha = commits.stream()
-                    .filter(c -> release.equals(c.getRelease()))
-                    .max((a, b) -> a.getDate().compareTo(b.getDate()))
-                    .map(GitCommit::getSha)
-                    .orElse(null);
-
-            if (lastSha != null) {
-                metricsServices.computeAllMetrics(classes, commits, repoName, lastSha);
-            }
+            metricsServices.computeAllMetrics(classes, commits, repoName);
 
             allClasses.addAll(classes);
         }
