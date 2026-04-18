@@ -1,14 +1,13 @@
 package org.example;
 
-import client.GitHubCommitClient;
 import client.JiraVersionClient;
 import config.AppConfig;
 import controller.AppController;
 import controller.Phase2Controller;
 import domain.BugTicketRecord;
-import mapper.CommitMapper;
 import service.ClassExtractorService;
 import service.LabelingService;
+import service.LocalGitService;
 import service.MetricsServices;
 import service.VersionService;
 import util.CsvTicketReader;
@@ -76,14 +75,15 @@ public class Main {
         System.out.println("Avvio phase2...");
 
         ProgressLogger logger = new ProgressLogger();
-        String githubToken = config.getSettings().getGithubToken();
 
-        GitHubCommitClient gitHubCommitClient = new GitHubCommitClient(githubToken, logger);
         JiraVersionClient jiraVersionClient = new JiraVersionClient(
                 "https://issues.apache.org/jira", "", "");
         VersionService versionService = new VersionService(jiraVersionClient);
-        CommitMapper commitMapper = new CommitMapper();
-        ClassExtractorService classExtractorService = new ClassExtractorService(gitHubCommitClient, logger);
+
+        // Clone locale del repo — un solo download, poi tutto offline
+        String repoName = config.getProjects().get(0).getRepoName();
+        LocalGitService localGitService = new LocalGitService(repoName, logger);
+        ClassExtractorService classExtractorService = new ClassExtractorService(localGitService, logger);
         MetricsServices metricsServices = new MetricsServices(logger);
         LabelingService labelingService = new LabelingService();
         PrintDatasetCsv printDatasetCsv = new PrintDatasetCsv();
@@ -92,7 +92,7 @@ public class Main {
         List<BugTicketRecord> tickets = csvTicketReader.read();
 
         Phase2Controller controller = new Phase2Controller(
-                versionService, gitHubCommitClient, commitMapper,
+                versionService, localGitService,
                 classExtractorService, metricsServices, labelingService,
                 printDatasetCsv, logger);
 

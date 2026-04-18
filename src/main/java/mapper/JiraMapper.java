@@ -75,7 +75,15 @@ public class JiraMapper {
                     .forEach(affected::add);
         }
 
-        return affected;
+        // rimuove duplicati per nome versione
+        List<ProjectVersion> unique = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (ProjectVersion v : affected) {
+            if (seen.add(v.getName())) {
+                unique.add(v);
+            }
+        }
+        return unique;
     }
 
     private LocalDateTime parseDate(String raw) {

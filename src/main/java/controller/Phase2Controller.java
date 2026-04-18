@@ -1,9 +1,7 @@
 package controller;
 
-import client.GitHubCommitClient;
 import config.ProjectConfig;
 import domain.*;
-import mapper.CommitMapper;
 import service.*;
 import util.ProgressLogger;
 import util.PrintDatasetCsv;
@@ -12,12 +10,13 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public class Phase2Controller {
 
     private final VersionService versionService;
-    private final GitHubCommitClient gitHubCommitClient;
-    private final CommitMapper commitMapper;
+    private final LocalGitService localGitService;
     private final ClassExtractorService classExtractorService;
     private final MetricsServices metricsServices;
     private final LabelingService labelingService;
@@ -25,16 +24,14 @@ public class Phase2Controller {
     private final ProgressLogger logger;
 
     public Phase2Controller(VersionService versionService,
-                            GitHubCommitClient gitHubCommitClient,
-                            CommitMapper commitMapper,
+                            LocalGitService localGitService,
                             ClassExtractorService classExtractorService,
                             MetricsServices metricsServices,
                             LabelingService labelingService,
                             PrintDatasetCsv printDatasetCsv,
                             ProgressLogger logger) {
         this.versionService = versionService;
-        this.gitHubCommitClient = gitHubCommitClient;
-        this.commitMapper = commitMapper;
+        this.localGitService = localGitService;
         this.classExtractorService = classExtractorService;
         this.metricsServices = metricsServices;
         this.labelingService = labelingService;
@@ -50,58 +47,77 @@ public class Phase2Controller {
         String projectKey = projectConfig.getKey();
         String repoName = projectConfig.getRepoName();
 
-        logger.logInfo("Scarico release reali da Jira per " + projectKey + " e applico il taglio al .." + windowPercent + "%");
+        logger.logInfo("Scarico release reali da Jira per " + projectKey + " e applico il taglio al " + windowPercent + "%");
         List<ProjectVersion> windowedReleases = versionService.loadVersions(projectKey, windowPercent);
+
+        if (windowedReleases == null || windowedReleases.isEmpty()) {
+            logger.logWarning("Nessuna release disponibile nella finestra per il progetto " + projectKey);
+            return;
+        }
+
         logger.logInfo("Release nella finestra: " + windowedReleases.size());
 
-        logger.logInfo("Scarico commit da GitHub per " + repoName + "...");
-        List<GitCommit> commits = commitMapper.mapCommits(
-                gitHubCommitClient.fetchAllCommits(projectConfig));
-        logger.logInfo("Totale commit scaricati: " + commits.size());
+        LocalDate windowStart = windowedReleases.get(0).getReleaseDate();
+        LocalDate windowEnd = windowedReleases.get(windowedReleases.size() - 1).getReleaseDate();
 
-        // ogni commit viene assegnato alla sua release
+        logger.logInfo("Finestra temporale considerata: [" + windowStart + " -> " + windowEnd + "]");
+
+        logger.logInfo("Leggo commit dal repo locale per " + repoName + "...");
+        List<GitCommit> allCommits = localGitService.fetchAllCommits();
+        logger.logInfo("Totale commit letti: " + allCommits.size());
+
+        // Mantengo solo i commit compresi nella finestra temporale delle release considerate
+        List<GitCommit> commits = allCommits.stream()
+                .filter(c -> c.getDate() != null)
+                .filter(c -> !c.getDate().isBefore(windowStart))
+                .filter(c -> !c.getDate().isAfter(windowEnd))
+                .toList();
+
+        long commitsFuoriFinestra = allCommits.size() - commits.size();
+
+        logger.logInfo("[CONSISTENCY] Commit nella finestra: " + commits.size() + "/" + allCommits.size());
+        logger.logInfo("[CONSISTENCY] Commit fuori finestra: " + commitsFuoriFinestra);
+
+        // Ogni commit nella finestra viene assegnato alla release opportuna
         for (GitCommit commit : commits) {
             ProjectVersion release = assignCommitToRelease(windowedReleases, commit.getDate());
             commit.setRelease(release);
         }
 
-        // === CONSISTENCY CHECK: commit per release ===
         long commitsConRelease = commits.stream().filter(c -> c.getRelease() != null).count();
         long commitsSenzaRelease = commits.stream().filter(c -> c.getRelease() == null).count();
-        logger.logInfo("[CONSISTENCY] Commit assegnati a una release: " + commitsConRelease + "/" + commits.size());
+
+        logger.logInfo("[CONSISTENCY] Commit nella finestra assegnati a una release: "
+                + commitsConRelease + "/" + commits.size());
+
         if (commitsSenzaRelease > 0) {
-            logger.logInfo("[CONSISTENCY] Commit senza release (fuori finestra): " + commitsSenzaRelease);
+            logger.logWarning("[CONSISTENCY] Commit nella finestra ma senza release assegnata: " + commitsSenzaRelease);
         }
 
-        logger.logInfo("Scarico touched paths e diffs per ogni commit...");
-        for (GitCommit commit : commits) {
-            if (commit.getTouchedPaths() == null) {
-                gitHubCommitClient.fetchTouchedPathsAndDiffs(repoName, commit);
-            }
-        }
-        logger.logInfo("Touched paths scaricati.");
+        // touchedPaths e diffs sono già inclusi nei commit letti dal repo locale
 
         logger.logInfo("Estrazione classi e calcolo metriche per release...");
         List<JavaClass> allClasses = new ArrayList<>();
+
         for (ProjectVersion release : windowedReleases) {
             List<JavaClass> classes = classExtractorService
                     .extractClassesForRelease(release, commits, repoName);
 
-            metricsServices.computeAllMetrics(classes, commits, repoName);
+            metricsServices.computeAllMetrics(classes, commits, release);
 
-            // === CONSISTENCY CHECK: classi per release ===
             logger.logInfo("[CONSISTENCY] Release " + release.getName()
                     + " -> classi estratte: " + classes.size());
 
             allClasses.addAll(classes);
         }
+
         logger.logInfo("Totale classi estratte: " + allClasses.size());
 
-        // === CONSISTENCY CHECK: classi uniche per nome ===
         long classiUniche = allClasses.stream()
                 .map(JavaClass::getName)
                 .distinct()
                 .count();
+
         logger.logInfo("[CONSISTENCY] Nomi classe distinti (su tutte le release): " + classiUniche);
 
         logger.logInfo("Avvio labeling...");
@@ -109,13 +125,14 @@ public class Phase2Controller {
                 .filter(t -> t.getProjectKey().equals(projectKey))
                 .toList();
 
-        // === CONSISTENCY CHECK: ticket disponibili per il labeling ===
         long ticketsConIV = projectTickets.stream()
                 .filter(t -> t.getInjectionVersion() != null)
                 .count();
+
         long ticketsSenzaIV = projectTickets.stream()
                 .filter(t -> t.getInjectionVersion() == null)
                 .count();
+
         logger.logInfo("[CONSISTENCY] Ticket del progetto: " + projectTickets.size()
                 + " | con IV: " + ticketsConIV
                 + " | senza IV (saltati): " + ticketsSenzaIV);
@@ -126,27 +143,21 @@ public class Phase2Controller {
         for (BugTicketRecord ticket : projectTickets) {
 
             if (ticket.getInjectionVersion() == null) {
-                logger.logWarning("Ticket " + ticket.getId() + " senza IV → saltato");
+                logger.logWarning("Ticket " + ticket.getId() + " senza IV -> saltato");
                 continue;
             }
 
             List<GitCommit> relevantCommits = commits.stream()
-                    .filter(c -> c.getMessage().contains(ticket.getTicketKey()))
+                    .filter(c -> c.getMessage() != null && c.getMessage().contains(ticket.getTicketKey()))
                     .toList();
 
             if (relevantCommits.isEmpty()) {
                 ticketsSenzaCommit++;
-                logger.logWarning("Nessun commit trovato per ticket " + ticket.getTicketKey());
+                logger.logWarning("Nessun commit trovato nella finestra per ticket " + ticket.getTicketKey());
                 continue;
             }
 
             ticketsConCommit++;
-
-            for (GitCommit commit : relevantCommits) {
-                if (commit.getTouchedPaths() == null) {
-                    gitHubCommitClient.fetchTouchedPathsAndDiffs(repoName, commit);
-                }
-            }
 
             labelingService.assignLabels(
                     allClasses,
@@ -154,14 +165,35 @@ public class Phase2Controller {
                     windowedReleases,
                     ticket.getInjectionVersion(),
                     ticket.getVersionRelation().getFixVersion());
+
+            // nFix: per ogni classe toccata da commit di bug-fix, incrementa solo
+            // le classi la cui release ha data >= data del commit (cumulativo come nRevisions)
+            Map<String, LocalDate> releaseNameToDate = windowedReleases.stream()
+                    .collect(Collectors.toMap(ProjectVersion::getName, ProjectVersion::getReleaseDate));
+
+            for (GitCommit commit : relevantCommits) {
+                if (commit.getTouchedPaths() == null || commit.getDate() == null) {
+                    continue;
+                }
+
+                for (String path : commit.getTouchedPaths()) {
+                    allClasses.stream()
+                            .filter(c -> c.getPath().equals(path))
+                            .filter(c -> {
+                                LocalDate relDate = releaseNameToDate.get(c.getRelease());
+                                return relDate != null && !relDate.isBefore(commit.getDate());
+                            })
+                            .forEach(c -> c.setNFix(c.getNFix() + 1));
+                }
+            }
         }
 
-        // === CONSISTENCY CHECK: risultato labeling ===
-        logger.logInfo("[CONSISTENCY] Ticket con almeno un commit: " + ticketsConCommit
-                + " | senza commit (non labellati): " + ticketsSenzaCommit);
+        logger.logInfo("[CONSISTENCY] Ticket con almeno un commit nella finestra: "
+                + ticketsConCommit + " | senza commit: " + ticketsSenzaCommit);
 
         long classiBuggy = allClasses.stream().filter(JavaClass::isBuggy).count();
         long classiClean = allClasses.stream().filter(c -> !c.isBuggy()).count();
+
         logger.logInfo("[CONSISTENCY] Classi buggy: " + classiBuggy
                 + " | classi clean: " + classiClean
                 + " | totale: " + allClasses.size());
@@ -172,7 +204,7 @@ public class Phase2Controller {
         List<ClassRecord> records = allClasses.stream()
                 .map(c -> new ClassRecord(
                         c.getRelease(),
-                        c.getName(),
+                        c.getPath(),
                         c.getLoc(),
                         c.getCommentLines(),
                         c.getNRevisions(),
@@ -185,40 +217,52 @@ public class Phase2Controller {
                         c.getMaxChurn(),
                         c.getAvgChurn(),
                         c.getLocTouched(),
-                        c.isBuggy()))
+                        c.getChangeSetSize(),
+                        c.getMaxChangeSet(),
+                        c.getAvgChangeSet(),
+                        c.getAge(),
+                        c.getWeightedAge(),
+                        c.getCyclomaticComplexity(),
+                        c.getDuplication(),
+                        c.getNBranches(),
+                        c.getMaxNestingDepth(),
+                        c.isBuggy(),
+                        c.getNSmells()))
                 .toList();
 
         printDatasetCsv.write(records);
 
-        // === CONSISTENCY CHECK FINALE ===
         logger.logInfo("[CONSISTENCY] ============ RIEPILOGO FASE 2 ============");
-        logger.logInfo("[CONSISTENCY] Progetto         : " + projectKey);
-        logger.logInfo("[CONSISTENCY] Release analizzate: " + windowedReleases.size());
-        logger.logInfo("[CONSISTENCY] Commit totali     : " + commits.size()
-                + " (assegnati: " + commitsConRelease + ", fuori finestra: " + commitsSenzaRelease + ")");
-        logger.logInfo("[CONSISTENCY] Classi totali     : " + allClasses.size()
+        logger.logInfo("[CONSISTENCY] Progetto              : " + projectKey);
+        logger.logInfo("[CONSISTENCY] Release analizzate    : " + windowedReleases.size());
+        logger.logInfo("[CONSISTENCY] Finestra temporale    : [" + windowStart + " -> " + windowEnd + "]");
+        logger.logInfo("[CONSISTENCY] Commit totali scaricati: " + allCommits.size());
+        logger.logInfo("[CONSISTENCY] Commit nella finestra : " + commits.size());
+        logger.logInfo("[CONSISTENCY] Commit fuori finestra : " + commitsFuoriFinestra);
+        logger.logInfo("[CONSISTENCY] Commit assegnati      : " + commitsConRelease);
+        logger.logInfo("[CONSISTENCY] Commit non assegnati  : " + commitsSenzaRelease);
+        logger.logInfo("[CONSISTENCY] Classi totali         : " + allClasses.size()
                 + " (nomi distinti: " + classiUniche + ")");
-        logger.logInfo("[CONSISTENCY] Classi buggy      : " + classiBuggy
+        logger.logInfo("[CONSISTENCY] Classi buggy          : " + classiBuggy
                 + " (" + String.format("%.1f", 100.0 * classiBuggy / allClasses.size()) + "%)");
-        logger.logInfo("[CONSISTENCY] Ticket usati      : " + ticketsConCommit
+        logger.logInfo("[CONSISTENCY] Ticket usati          : " + ticketsConCommit
                 + "/" + ticketsConIV + " con IV");
-        logger.logInfo("[CONSISTENCY] Record CSV scritti: " + records.size());
+        logger.logInfo("[CONSISTENCY] Record CSV scritti    : " + records.size());
         logger.logInfo("[CONSISTENCY] ==========================================");
     }
 
-
-    // assegno il commit alla sua release in base alla data
+    // Assegna un commit alla release che esso contribuisce a costruire:
+    // intervallo (release precedente, release corrente]
     private ProjectVersion assignCommitToRelease(List<ProjectVersion> releases,
                                                  LocalDate commitDate) {
         for (int i = 0; i < releases.size(); i++) {
             ProjectVersion current = releases.get(i);
-            boolean isLast = (i == releases.size() - 1);
-            ProjectVersion next = isLast ? null : releases.get(i + 1);
+            ProjectVersion previous = (i == 0) ? null : releases.get(i - 1);
 
-            boolean afterCurrent = !commitDate.isBefore(current.getReleaseDate());
-            boolean beforeNext = next == null || commitDate.isBefore(next.getReleaseDate());
+            boolean afterPrevious = previous == null || commitDate.isAfter(previous.getReleaseDate());
+            boolean onOrBeforeCurrent = !commitDate.isAfter(current.getReleaseDate());
 
-            if (afterCurrent && beforeNext) {
+            if (afterPrevious && onOrBeforeCurrent) {
                 return current;
             }
         }

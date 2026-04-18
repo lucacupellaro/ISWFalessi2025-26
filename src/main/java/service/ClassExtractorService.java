@@ -1,6 +1,5 @@
 package service;
 
-import client.GitHubCommitClient;
 import domain.GitCommit;
 import domain.JavaClass;
 import domain.ProjectVersion;
@@ -13,15 +12,15 @@ import java.util.Optional;
 
 public class ClassExtractorService {
 
-    private final GitHubCommitClient gitHubCommitClient;
+    private final LocalGitService localGitService;
     private final ProgressLogger logger;
 
-    public ClassExtractorService(GitHubCommitClient gitHubCommitClient, ProgressLogger logger) {
-        this.gitHubCommitClient = gitHubCommitClient;
+    public ClassExtractorService(LocalGitService localGitService, ProgressLogger logger) {
+        this.localGitService = localGitService;
         this.logger = logger;
     }
 
-    //Data una realease, trovato l'ultimo commit, ottiene i path di tutte le classi Java presenti nel repo a quel punto della storia.
+    //Data una release, trovato l'ultimo commit, ottiene i path di tutte le classi Java presenti nel repo a quel punto della storia.
     public List<JavaClass> extractClassesForRelease(ProjectVersion release,
                                                     List<GitCommit> commits,
                                                     String repoName)
@@ -34,12 +33,17 @@ public class ClassExtractorService {
             return new ArrayList<>();
         }
 
-        List<String> paths = gitHubCommitClient.fetchJavaClasses(repoName, lastCommit.get().getSha());
+        String sha = lastCommit.get().getSha();
+        List<String> paths = localGitService.listJavaFiles(sha);
         List<JavaClass> classes = new ArrayList<>();
 
         for (String path : paths) {
             String name = extractClassName(path);
-            classes.add(new JavaClass(name, path, release.getName()));
+            JavaClass jc = new JavaClass(name, path, release.getName());
+            // legge il contenuto dal clone locale (nessuna chiamata API)
+            String content = localGitService.readFileContent(sha, path);
+            jc.setContent(content);
+            classes.add(jc);
         }
 
         logger.logInfo("Release " + release.getName() + " — classi trovate: " + classes.size());

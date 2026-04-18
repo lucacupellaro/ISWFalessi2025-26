@@ -10,7 +10,12 @@ import java.util.List;
 public class PrintDatasetCsv {
 
     private static final String OUTPUT_PATH = "src/main/java/file/DatasetClassiRelease.csv";
-    private static final String HEADER = "release,className,loc,commentLines,nRevisions,nAuth,nFix,locAdded,maxLocAdded,avgLocAdded,churn,maxChurn,avgChurn,locTouched,buggy";
+    private static final String HEADER = "release,className,loc,commentLines," +
+            "nRevisions,nAuth,nFix,locAdded,maxLocAdded,avgLocAdded," +
+            "churn,maxChurn,avgChurn,locTouched," +
+            "changeSetSize,maxChangeSet,avgChangeSet,age,weightedAge," +
+            "cyclomaticComplexity,duplication,nBranches,maxNestingDepth," +
+            "nSmells,buggy";
     private final ProgressLogger logger = new ProgressLogger();
 
     public void write(List<ClassRecord> records) throws IOException {
@@ -41,6 +46,16 @@ public class PrintDatasetCsv {
                 String.valueOf(record.getMaxChurn()),
                 String.valueOf(record.getAvgChurn()),
                 String.valueOf(record.getLocTouched()),
+                String.valueOf(record.getChangeSetSize()),
+                String.valueOf(record.getMaxChangeSet()),
+                String.valueOf(record.getAvgChangeSet()),
+                String.valueOf(record.getAge()),
+                String.valueOf(record.getWeightedAge()),
+                String.valueOf(record.getCyclomaticComplexity()),
+                String.valueOf(record.getDuplication()),
+                String.valueOf(record.getNBranches()),
+                String.valueOf(record.getMaxNestingDepth()),
+                String.valueOf(record.getNSmells()),
                 record.isBuggy() ? "yes" : "no");
     }
 }
