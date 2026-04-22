@@ -33,6 +33,11 @@
             <artifactId>pmd-java</artifactId>
             <version>7.0.0</version>
         </dependency>
+        <dependency>
+            <groupId>nz.ac.waikato.cms.weka</groupId>
+            <artifactId>weka-stable</artifactId>
+            <version>3.8.6</version>
+        </dependency>
     </dependencies>
     <build>
         <resources>
