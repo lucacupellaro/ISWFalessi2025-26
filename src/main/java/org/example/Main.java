@@ -3,6 +3,7 @@ package org.example;
 import client.JiraVersionClient;
 import config.AppConfig;
 import controller.AppController;
+import controller.MLWekaController;
 import controller.Phase2Controller;
 import domain.BugTicketRecord;
 import service.ClassExtractorService;
@@ -27,7 +28,7 @@ public class Main {
         int percent = config.getSettings().getMaxVersionsPercent();
 
         if (args.length == 0) {
-            System.out.println("Specificare phase1 o phase2 come argomento");
+            System.out.println("Specificare phase1, phase2 o phase3 come argomento");
             return;
         }
 
@@ -35,6 +36,8 @@ public class Main {
             runPhase1(config, percent);
         } else if (args[0].equals("phase2")) {
             runPhase2(config);
+        } else if (args[0].equals("phase3")) {
+            runPhase3();
         } else {
             System.out.println("Argomento non riconosciuto: " + args[0]);
         }
@@ -107,5 +110,11 @@ public class Main {
                         + project.getKey() + ": " + e.getMessage());
             }
         });
+    }
+
+    private static void runPhase3() throws Exception {
+        System.out.println("Avvio phase3 — MLWeka Pipeline...");
+        MLWekaController controller = new MLWekaController();
+        controller.run();
     }
 }
