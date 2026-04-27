@@ -1,0 +1,74 @@
+Feature Selection Report
+========================
+Input CSV: src/main/java/file/DatasetTrainingClassiRealeseNormalized.csv
+Search method: GreedyStepwise Forward
+Attribute evaluator: WrapperSubsetEval
+Wrapper classifier: NaiveBayes
+Wrapper internal folds: 5
+Wrapper internal seed: 1
+Outer cross-validation folds: 10
+Outer cross-validation seed: 1
+Class attribute: BUGGY
+
+Selected attributes on full training set
+---------------------------------------
+Selected predictive attributes: 4
+- [5] nFix
+- [11] avgChurn
+- [15] avgChangeSet
+- [17] weightedAge
+
+Weka full-selection output
+--------------------------
+
+
+=== Attribute Selection on all input data ===
+
+Search Method:
+	Greedy Stepwise (forwards).
+	Start set: no attributes
+	Merit of best subset found:    0.908
+
+Attribute Subset Evaluator (supervised, Class (nominal): 23 buggy):
+	Wrapper Subset Evaluator
+	Learning scheme: weka.classifiers.bayes.NaiveBayes
+	Scheme options: 
+	Subset evaluation: classification accuracy
+	Number of folds for accuracy estimation: 5
+
+Selected attributes: 5,11,15,17 : 4
+                     nFix
+                     avgChurn
+                     avgChangeSet
+                     weightedAge
+
+Weka 10-fold cross-validation output
+------------------------------------
+
+
+=== Attribute selection 10 fold cross-validation (stratified), seed: 1 ===
+
+number of folds (%)  attribute
+           0(  0 %)     1 loc
+           0(  0 %)     2 commentLines
+           0(  0 %)     3 nRevisions
+           0(  0 %)     4 nAuth
+          10(100 %)     5 nFix
+           0(  0 %)     6 locAdded
+           0(  0 %)     7 maxLocAdded
+           2( 20 %)     8 avgLocAdded
+           0(  0 %)     9 churn
+           0(  0 %)    10 maxChurn
+           6( 60 %)    11 avgChurn
+           0(  0 %)    12 locTouched
+           0(  0 %)    13 changeSetSize
+           0(  0 %)    14 maxChangeSet
+          10(100 %)    15 avgChangeSet
+           0(  0 %)    16 age
+           8( 80 %)    17 weightedAge
+           0(  0 %)    18 cyclomaticComplexity
+           0(  0 %)    19 duplication
+           0(  0 %)    20 nBranches
+           0(  0 %)    21 maxNestingDepth
+           0(  0 %)    22 nSmells
+

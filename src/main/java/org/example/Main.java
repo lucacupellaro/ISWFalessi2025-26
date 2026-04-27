@@ -37,7 +37,7 @@ public class Main {
         } else if (args[0].equals("phase2")) {
             runPhase2(config);
         } else if (args[0].equals("phase3")) {
-            runPhase3();
+            runPhase3(args);
         } else {
             System.out.println("Argomento non riconosciuto: " + args[0]);
         }
@@ -112,9 +112,22 @@ public class Main {
         });
     }
 
-    private static void runPhase3() throws Exception {
+    private static void runPhase3(String[] args) throws Exception {
+
         System.out.println("Avvio phase3 — MLWeka Pipeline...");
         MLWekaController controller = new MLWekaController();
-        controller.run();
+
+       // controller.normalizeDataset()
+        controller.normalizeDatasetShuffled();
+        /*
+        if (args[1].equals("FeatureS")) {
+            controller.runFeatureSelection();
+        } else if (args[1].equals("Balancing")) {
+            controller.runBalancing();
+        }
+        */
+
+
+
     }
 }
