@@ -1,81 +1,95 @@
 package controller;
 
+import MLWeka.Balancing;
 import MLWeka.DataEngeneering;
 import MLWeka.FeatureSelection;
-import MLWeka.FeatureSelection.ExperimentResult;
+import MLWeka.FeatureSelection.ClassifierType;
 import MLWeka.WekaConfig;
 import weka.core.Instances;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.logging.Logger;
 
 public class MLWekaController {
 
     private static final Logger logger = Logger.getLogger(MLWekaController.class.getName());
     private static final String DATASET_PATH = "src/main/java/file/DatasetClassiRelease.csv";
+    private static final String CSV_PATH_NORMALIZED = "src/main/java/file/DatasetClassiRealeseNormalized.csv";
+    private static final String CSV_PATH_NORMALIZED_shuffled = "src/main/java/file/DatasetClassiRealeseNormalizedShuffled.csv";
+    private static final String TRAIN_BALANCED_CSV_PATH = "src/main/java/file/DatasetTrainingBalancedFull.csv";
 
-    public void run() throws Exception {
-        logger.info("=== Avvio MLWeka Pipeline ===");
 
-        // 1. Carica il dataset
+    private static final int WRAPPER_FOLDS = 5;
+    private static final int WRAPPER_SEED = 1;
+    private static final int CV_FOLDS = 10;
+    private static final int CV_SEED = 1;
+    private static final int SPLIT_SEED = 42;
+
+    private final DataEngeneering dataEng = new DataEngeneering();
+
+    private Instances[] loadAndSplit() throws Exception {
+        Instances data = WekaConfig.loadDataset(DATASET_PATH);
+        return dataEng.stratifiedSplit(data, SPLIT_SEED);
+    }
+
+    public void runFeatureSelection() throws Exception {
+        /*
+        logger.info("=== Avvio Feature Selection Pipeline ===");
         Instances data = WekaConfig.loadDataset(DATASET_PATH);
 
-        // 2. Split stratificato 80/20
-        DataEngeneering dataEng = new DataEngeneering();
-        Instances[] split = dataEng.stratifiedSplit(data, 42);
-        Instances trainSet = split[0];
-        Instances testSet = split[1];
+        //Instances[] split = loadAndSplit();
+        Instances trainSet = dataEng.standardizeZScore(data);
 
-        // 3. Normalizzazione log1p
-        trainSet = dataEng.normalizeLog1p(trainSet);
-        testSet = dataEng.normalizeLog1p(testSet);
+        dataEng.saveToCsv(trainSet, TRAIN_CSV_PATH);
 
-        // Salva il dataset normalizzato su CSV
-        dataEng.saveToCsv(trainSet, "src/main/java/file/DatasetTrainingClassiRealeseNormalized.csv");
+        ClassifierType classifierType = ClassifierType.IBK;
+        String baseName = classifierType.name().toLowerCase();
 
-        // 4. Feature Selection: 3 classificatori × forward + backward = 6 esperimenti
         FeatureSelection featureSelection = new FeatureSelection();
-        List<ExperimentResult> allResults = new ArrayList<>();
 
-        logger.info("--- Feature Selection Experiments (Forward) ---");
-        allResults.addAll(featureSelection.runAllExperiments(trainSet, 5, 10, 42, false));
+        featureSelection.runBackwardSearch(
+                trainSet, classifierType,
+                WRAPPER_FOLDS, WRAPPER_SEED, CV_FOLDS, CV_SEED,
+                TRAIN_CSV_PATH,
+                "src/main/java/file/" + baseName + "BackwardSearch.txt");
 
-        logger.info("--- Feature Selection Experiments (Backward) ---");
-        allResults.addAll(featureSelection.runAllExperiments(trainSet, 5, 10, 42, true));
+        featureSelection.runForwardSearch(
+                trainSet, classifierType,
+                WRAPPER_FOLDS, WRAPPER_SEED, CV_FOLDS, CV_SEED,
+                TRAIN_CSV_PATH,
+                "src/main/java/file/" + baseName + "ForwardSearch.txt");
 
-        // 5. Salva tutti i risultati su CSV
-        saveResultsToCsv(allResults, "src/main/java/file/FeatureSelectionResults.csv");
-
-        logger.info("=== MLWeka Pipeline completata ===");
+        logger.info("=== Feature Selection Pipeline completata ===");
+                 */
     }
 
-    private void saveResultsToCsv(List<ExperimentResult> results, String path) throws IOException {
-        File file = new File(path);
-        file.getParentFile().mkdirs();
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
-            writer.write("Classifier,SearchDirection,InnerFolds,OuterFolds,AUC,Precision,Recall,F1");
-            writer.newLine();
-
-            for (ExperimentResult r : results) {
-                writer.write(String.format("%s,%s,%d,%d,%.4f,%.4f,%.4f,%.4f",
-                        r.getClassifierName(),
-                        r.getSearchDirection(),
-                        r.getInnerFolds(),
-                        r.getOuterFolds(),
-                        r.getEvaluation().weightedAreaUnderROC(),
-                        r.getEvaluation().weightedPrecision(),
-                        r.getEvaluation().weightedRecall(),
-                        r.getEvaluation().weightedFMeasure()
-                ));
-                writer.newLine();
-            }
-        }
-        logger.info("Risultati salvati in: " + path);
+    public void normalizeDataset() throws Exception {
+        logger.info("=== Avvio Normalizzazione Z-Score ===");
+        Instances data = WekaConfig.loadDataset(DATASET_PATH);
+        Instances normalized = dataEng.normalizeMinMax(data);
+        dataEng.saveToCsv(normalized, CSV_PATH_NORMALIZED);
+        logger.info("=== Normalizzazione completata ===");
     }
+
+    public void normalizeDatasetShuffled() throws Exception {
+        logger.info("=== Avvio Normalizzazione Z-Score ===");
+        Instances data = WekaConfig.loadDataset(DATASET_PATH,false);
+        Instances normalized = dataEng.normalizeMinMax(data);
+        normalized.randomize(new java.util.Random());
+        dataEng.saveToCsv(normalized, CSV_PATH_NORMALIZED_shuffled);
+        logger.info("=== Normalizzazione e shuffle completati ===");
+    }
+
+    public void runBalancing() throws Exception {
+        logger.info("=== Avvio Balancing Pipeline ===");
+
+        Instances[] split = loadAndSplit();
+        Instances trainSet = split[0];
+
+        Balancing balancing = new Balancing();
+        trainSet = balancing.oversample(trainSet, 1);
+        dataEng.saveToCsv(trainSet, TRAIN_BALANCED_CSV_PATH);
+
+        logger.info("=== Balancing Pipeline completata ===");
+    }
+
 }

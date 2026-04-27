@@ -1,0 +1,84 @@
+Feature Selection Report
+========================
+Input CSV: src/main/java/file/DatasetTrainingClassiRealeseNormalized.csv
+Search method: GreedyStepwise Forward
+Attribute evaluator: WrapperSubsetEval
+Wrapper classifier: IBk
+Wrapper internal folds: 5
+Wrapper internal seed: 1
+Outer cross-validation folds: 10
+Outer cross-validation seed: 1
+Class attribute: BUGGY
+
+Selected attributes on full training set
+---------------------------------------
+Selected predictive attributes: 9
+- [1] loc
+- [2] commentLines
+- [6] locAdded
+- [7] maxLocAdded
+- [10] maxChurn
+- [11] avgChurn
+- [12] locTouched
+- [14] maxChangeSet
+- [20] nBranches
+
+Weka full-selection output
+--------------------------
+
+
+=== Attribute Selection on all input data ===
+
+Search Method:
+	Greedy Stepwise (forwards).
+	Start set: no attributes
+	Merit of best subset found:    0.958
+
+Attribute Subset Evaluator (supervised, Class (nominal): 23 buggy):
+	Wrapper Subset Evaluator
+	Learning scheme: weka.classifiers.lazy.IBk
+	Scheme options: -K 1 -W 0 -A weka.core.neighboursearch.LinearNNSearch -A "weka.core.EuclideanDistance -R first-last" 
+	Subset evaluation: classification accuracy
+	Number of folds for accuracy estimation: 5
+
+Selected attributes: 1,2,6,7,10,11,12,14,20 : 9
+                     loc
+                     commentLines
+                     locAdded
+                     maxLocAdded
+                     maxChurn
+                     avgChurn
+                     locTouched
+                     maxChangeSet
+                     nBranches
+
+Weka 10-fold cross-validation output
+------------------------------------
+
+
+=== Attribute selection 10 fold cross-validation (stratified), seed: 1 ===
+
+number of folds (%)  attribute
+           1( 10 %)     1 loc
+           4( 40 %)     2 commentLines
+           0(  0 %)     3 nRevisions
+           2( 20 %)     4 nAuth
+           1( 10 %)     5 nFix
+           6( 60 %)     6 locAdded
+           9( 90 %)     7 maxLocAdded
+           2( 20 %)     8 avgLocAdded
+           0(  0 %)     9 churn
+           7( 70 %)    10 maxChurn
+          10(100 %)    11 avgChurn
+           7( 70 %)    12 locTouched
+           1( 10 %)    13 changeSetSize
+           7( 70 %)    14 maxChangeSet
+           1( 10 %)    15 avgChangeSet
+           0(  0 %)    16 age
+           0(  0 %)    17 weightedAge
+           1( 10 %)    18 cyclomaticComplexity
+           1( 10 %)    19 duplication
+           2( 20 %)    20 nBranches
+           8( 80 %)    21 maxNestingDepth
+           0(  0 %)    22 nSmells
+

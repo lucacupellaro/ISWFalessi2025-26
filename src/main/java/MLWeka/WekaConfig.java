@@ -19,13 +19,19 @@ public class WekaConfig {
      * (release e className) e imposta "buggy" come classe.
      */
     public static Instances loadDataset(String csvPath) throws IOException {
+        return loadDataset(csvPath, true);
+    }
+
+    public static Instances loadDataset(String csvPath, boolean removeIdentifiers) throws IOException {
         CSVLoader loader = new CSVLoader();
         loader.setSource(new File(csvPath));
         Instances data = loader.getDataSet();
 
-        // Rimuovi className (indice 1) e release (indice 0) — rimuovi prima l'indice più alto
-        data.deleteAttributeAt(1);
-        data.deleteAttributeAt(0);
+        if (removeIdentifiers) {
+            // Rimuovi className (indice 1) e release (indice 0) — rimuovi prima l'indice più alto
+            data.deleteAttributeAt(1);
+            data.deleteAttributeAt(0);
+        }
 
         // Imposta l'ultima colonna (buggy) come classe
         data.setClassIndex(data.numAttributes() - 1);
