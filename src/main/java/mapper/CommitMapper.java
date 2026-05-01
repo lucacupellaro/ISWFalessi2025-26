@@ -13,6 +13,7 @@ import java.util.List;
 
 public class CommitMapper {
 
+    private static final String COMMIT_FIELD = "commit";
     private final ProgressLogger logger = new ProgressLogger();
 
     //itera la lista grezza dei commit
@@ -33,9 +34,9 @@ public class CommitMapper {
     private GitCommit mapSingle(JsonNode node) {
         try {
             String sha = node.path("sha").asText(null);
-            String message = node.path("commit").path("message").asText(null);
-            String dateStr = node.path("commit").path("author").path("date").asText(null);
-            String author = node.path("commit").path("author").path("name").asText(null);
+            String message = node.path(COMMIT_FIELD).path("message").asText(null);
+            String dateStr = node.path(COMMIT_FIELD).path("author").path("date").asText(null);
+            String author = node.path(COMMIT_FIELD).path("author").path("name").asText(null);
 
             if (sha == null || message == null || dateStr == null) {
                 logger.logWarning("Commit scartato: campo mancante");

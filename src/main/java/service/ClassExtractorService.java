@@ -22,8 +22,7 @@ public class ClassExtractorService {
 
     //Data una release, trovato l'ultimo commit, ottiene i path di tutte le classi Java presenti nel repo a quel punto della storia.
     public List<JavaClass> extractClassesForRelease(ProjectVersion release,
-                                                    List<GitCommit> commits,
-                                                    String repoName)
+                                                    List<GitCommit> commits)
             throws IOException, InterruptedException {
 
         Optional<GitCommit> lastCommit = findLastCommitForRelease(commits, release);

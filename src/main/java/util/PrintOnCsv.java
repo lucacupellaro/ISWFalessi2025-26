@@ -6,6 +6,7 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -45,7 +46,8 @@ public class PrintOnCsv {
                 writer.newLine();
             }
 
-            logger.info("[CSV] Scritti " + records.size() + " record su " + FILE_NAME);
+            logger.log(Level.INFO, "[CSV] Scritti {0} record su {1}",
+                    new Object[]{records.size(), FILE_NAME});
 
         } catch (IOException e) {
             throw new IllegalStateException("Errore scrittura CSV: " + e.getMessage(), e);

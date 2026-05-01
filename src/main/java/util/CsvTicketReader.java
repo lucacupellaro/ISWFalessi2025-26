@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
+
 
 public class CsvTicketReader {
 
@@ -28,9 +28,9 @@ public class CsvTicketReader {
 
             String line;
             while ((line = reader.readLine()) != null) {
-                BugTicketRecord record = parseLine(line);
-                if (record != null) {
-                    records.add(record);
+                BugTicketRecord ticketRecord = parseLine(line);
+                if (ticketRecord != null) {
+                    records.add(ticketRecord);
                 }
             }
         }
@@ -80,7 +80,7 @@ public class CsvTicketReader {
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .map(name -> new ProjectVersion(name, null))
-                .collect(Collectors.toList());
+                .toList();
     }
 
     private LocalDateTime parseDateTime(String value) {

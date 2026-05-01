@@ -22,40 +22,40 @@ public class PrintDatasetCsv {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(OUTPUT_PATH))) {
             writer.write(HEADER);
             writer.newLine();
-            for (ClassRecord record : records) {
-                writer.write(buildRow(record));
+            for (ClassRecord classRecord : records) {
+                writer.write(buildRow(classRecord));
                 writer.newLine();
             }
         }
         logger.logInfo("Dataset.csv scritto con " + records.size() + " righe");
     }
 
-    private String buildRow(ClassRecord record) {
+    private String buildRow(ClassRecord classRecord) {
         return String.join(",",
-                record.getRelease(),
-                record.getClassName(),
-                String.valueOf(record.getLoc()),
-                String.valueOf(record.getCommentLines()),
-                String.valueOf(record.getNRevisions()),
-                String.valueOf(record.getNAuth()),
-                String.valueOf(record.getNFix()),
-                String.valueOf(record.getLocAdded()),
-                String.valueOf(record.getMaxLocAdded()),
-                String.valueOf(record.getAvgLocAdded()),
-                String.valueOf(record.getChurn()),
-                String.valueOf(record.getMaxChurn()),
-                String.valueOf(record.getAvgChurn()),
-                String.valueOf(record.getLocTouched()),
-                String.valueOf(record.getChangeSetSize()),
-                String.valueOf(record.getMaxChangeSet()),
-                String.valueOf(record.getAvgChangeSet()),
-                String.valueOf(record.getAge()),
-                String.valueOf(record.getWeightedAge()),
-                String.valueOf(record.getCyclomaticComplexity()),
-                String.valueOf(record.getDuplication()),
-                String.valueOf(record.getNBranches()),
-                String.valueOf(record.getMaxNestingDepth()),
-                String.valueOf(record.getNSmells()),
-                record.isBuggy() ? "yes" : "no");
+                classRecord.getRelease(),
+                classRecord.getClassName(),
+                String.valueOf(classRecord.getLoc()),
+                String.valueOf(classRecord.getCommentLines()),
+                String.valueOf(classRecord.getNRevisions()),
+                String.valueOf(classRecord.getNAuth()),
+                String.valueOf(classRecord.getNFix()),
+                String.valueOf(classRecord.getLocAdded()),
+                String.valueOf(classRecord.getMaxLocAdded()),
+                String.valueOf(classRecord.getAvgLocAdded()),
+                String.valueOf(classRecord.getChurn()),
+                String.valueOf(classRecord.getMaxChurn()),
+                String.valueOf(classRecord.getAvgChurn()),
+                String.valueOf(classRecord.getLocTouched()),
+                String.valueOf(classRecord.getChangeSetSize()),
+                String.valueOf(classRecord.getMaxChangeSet()),
+                String.valueOf(classRecord.getAvgChangeSet()),
+                String.valueOf(classRecord.getAge()),
+                String.valueOf(classRecord.getWeightedAge()),
+                String.valueOf(classRecord.getCyclomaticComplexity()),
+                String.valueOf(classRecord.getDuplication()),
+                String.valueOf(classRecord.getNBranches()),
+                String.valueOf(classRecord.getMaxNestingDepth()),
+                String.valueOf(classRecord.getNSmells()),
+                classRecord.isBuggy() ? "yes" : "no");
     }
 }

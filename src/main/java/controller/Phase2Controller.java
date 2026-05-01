@@ -62,6 +62,40 @@ public class Phase2Controller {
 
         logger.logInfo("Finestra temporale considerata: [" + windowStart + " -> " + windowEnd + "]");
 
+        List<GitCommit> allCommits = loadAndFilterCommits(repoName, windowedReleases, windowStart, windowEnd);
+        List<GitCommit> commits = allCommits.stream()
+                .filter(c -> c.getDate() != null)
+                .filter(c -> !c.getDate().isBefore(windowStart))
+                .filter(c -> !c.getDate().isAfter(windowEnd))
+                .toList();
+
+        List<JavaClass> allClasses = extractAndComputeMetrics(windowedReleases, commits, allCommits);
+
+        int[] labelingCounts = labelClasses(projectKey, tickets, commits, allClasses, windowedReleases);
+        int ticketsConCommit = labelingCounts[0];
+
+        long ticketsConIV = tickets.stream()
+                .filter(t -> t.getProjectKey().equals(projectKey))
+                .filter(t -> t.getInjectionVersion() != null)
+                .count();
+
+        long classiBuggy = allClasses.stream().filter(JavaClass::isBuggy).count();
+
+        logger.logInfo("Scrittura dataset...");
+        List<ClassRecord> records = buildRecords(allClasses);
+        printDatasetCsv.write(records);
+
+        logSummary(projectKey, windowedReleases, windowStart, windowEnd,
+                allCommits, commits, allClasses, classiBuggy,
+                ticketsConCommit, ticketsConIV, records);
+    }
+
+    private List<GitCommit> loadAndFilterCommits(String repoName,
+                                                  List<ProjectVersion> windowedReleases,
+                                                  LocalDate windowStart,
+                                                  LocalDate windowEnd)
+            throws IOException, InterruptedException {
+
         logger.logInfo("Leggo commit dal repo locale per " + repoName + "...");
         List<GitCommit> allCommits = localGitService.fetchAllCommits();
         logger.logInfo("Totale commit letti: " + allCommits.size());
@@ -94,7 +128,13 @@ public class Phase2Controller {
             logger.logWarning("[CONSISTENCY] Commit nella finestra ma senza release assegnata: " + commitsSenzaRelease);
         }
 
-        // touchedPaths e diffs sono già inclusi nei commit letti dal repo locale
+        return allCommits;
+    }
+
+    private List<JavaClass> extractAndComputeMetrics(List<ProjectVersion> windowedReleases,
+                                                      List<GitCommit> commits,
+                                                      List<GitCommit> allCommits)
+            throws IOException, InterruptedException {
 
         logger.logInfo("Estrazione classi e calcolo metriche per release...");
         List<JavaClass> allClasses = new ArrayList<>();
@@ -103,7 +143,7 @@ public class Phase2Controller {
             ProjectVersion release = windowedReleases.get(i);
 
             List<JavaClass> classes = classExtractorService
-                    .extractClassesForRelease(release, commits, repoName);
+                    .extractClassesForRelease(release, commits);
 
             // Trova lo SHA dell'ultimo commit della release precedente (null per la prima)
             String previousReleaseSha = null;
@@ -129,6 +169,15 @@ public class Phase2Controller {
 
         logger.logInfo("[CONSISTENCY] Nomi classe distinti (su tutte le release): " + classiUniche);
 
+        return allClasses;
+    }
+
+    private int[] labelClasses(String projectKey,
+                               List<BugTicketRecord> tickets,
+                               List<GitCommit> commits,
+                               List<JavaClass> allClasses,
+                               List<ProjectVersion> windowedReleases) {
+
         logger.logInfo("Avvio labeling...");
         List<BugTicketRecord> projectTickets = tickets.stream()
                 .filter(t -> t.getProjectKey().equals(projectKey))
@@ -149,51 +198,15 @@ public class Phase2Controller {
         int ticketsConCommit = 0;
         int ticketsSenzaCommit = 0;
 
+        Map<String, LocalDate> releaseNameToDate = windowedReleases.stream()
+                .collect(Collectors.toMap(ProjectVersion::getName, ProjectVersion::getReleaseDate));
+
         for (BugTicketRecord ticket : projectTickets) {
-
-            if (ticket.getInjectionVersion() == null) {
-                logger.logWarning("Ticket " + ticket.getId() + " senza IV -> saltato");
-                continue;
-            }
-
-            List<GitCommit> relevantCommits = commits.stream()
-                    .filter(c -> c.getMessage() != null && c.getMessage().contains(ticket.getTicketKey()))
-                    .toList();
-
-            if (relevantCommits.isEmpty()) {
+            int result = processTicketForLabeling(ticket, commits, allClasses, windowedReleases, releaseNameToDate);
+            if (result > 0) {
+                ticketsConCommit++;
+            } else if (result < 0) {
                 ticketsSenzaCommit++;
-                logger.logWarning("Nessun commit trovato nella finestra per ticket " + ticket.getTicketKey());
-                continue;
-            }
-
-            ticketsConCommit++;
-
-            labelingService.assignLabels(
-                    allClasses,
-                    relevantCommits,
-                    windowedReleases,
-                    ticket.getInjectionVersion(),
-                    ticket.getVersionRelation().getFixVersion());
-
-            // nFix: per ogni classe toccata da commit di bug-fix, incrementa solo
-            // le classi la cui release ha data >= data del commit (cumulativo come nRevisions)
-            Map<String, LocalDate> releaseNameToDate = windowedReleases.stream()
-                    .collect(Collectors.toMap(ProjectVersion::getName, ProjectVersion::getReleaseDate));
-
-            for (GitCommit commit : relevantCommits) {
-                if (commit.getTouchedPaths() == null || commit.getDate() == null) {
-                    continue;
-                }
-
-                for (String path : commit.getTouchedPaths()) {
-                    allClasses.stream()
-                            .filter(c -> c.getPath().equals(path))
-                            .filter(c -> {
-                                LocalDate relDate = releaseNameToDate.get(c.getRelease());
-                                return relDate != null && !relDate.isBefore(commit.getDate());
-                            })
-                            .forEach(c -> c.setNFix(c.getNFix() + 1));
-                }
             }
         }
 
@@ -209,37 +222,108 @@ public class Phase2Controller {
 
         logger.logInfo("Labeling completato per " + projectKey);
 
-        logger.logInfo("Scrittura dataset...");
-        List<ClassRecord> records = allClasses.stream()
-                .map(c -> new ClassRecord(
-                        c.getRelease(),
-                        c.getPath(),
-                        c.getLoc(),
-                        c.getCommentLines(),
-                        c.getNRevisions(),
-                        c.getNAuth(),
-                        c.getNFix(),
-                        c.getLocAdded(),
-                        c.getMaxLocAdded(),
-                        c.getAvgLocAdded(),
-                        c.getChurn(),
-                        c.getMaxChurn(),
-                        c.getAvgChurn(),
-                        c.getLocTouched(),
-                        c.getChangeSetSize(),
-                        c.getMaxChangeSet(),
-                        c.getAvgChangeSet(),
-                        c.getAge(),
-                        c.getWeightedAge(),
-                        c.getCyclomaticComplexity(),
-                        c.getDuplication(),
-                        c.getNBranches(),
-                        c.getMaxNestingDepth(),
-                        c.isBuggy(),
-                        c.getNSmells()))
+        return new int[]{ticketsConCommit, ticketsSenzaCommit};
+    }
+
+    /**
+     * Processes a single ticket for labeling.
+     * Returns: +1 if the ticket had relevant commits, -1 if no commits found, 0 if skipped (no IV).
+     */
+    private int processTicketForLabeling(BugTicketRecord ticket,
+                                          List<GitCommit> commits,
+                                          List<JavaClass> allClasses,
+                                          List<ProjectVersion> windowedReleases,
+                                          Map<String, LocalDate> releaseNameToDate) {
+
+        if (ticket.getInjectionVersion() == null) {
+            logger.logWarning("Ticket " + ticket.getId() + " senza IV -> saltato");
+            return 0;
+        }
+
+        List<GitCommit> relevantCommits = commits.stream()
+                .filter(c -> c.getMessage() != null && c.getMessage().contains(ticket.getTicketKey()))
                 .toList();
 
-        printDatasetCsv.write(records);
+        if (relevantCommits.isEmpty()) {
+            logger.logWarning("Nessun commit trovato nella finestra per ticket " + ticket.getTicketKey());
+            return -1;
+        }
+
+        labelingService.assignLabels(
+                allClasses,
+                relevantCommits,
+                windowedReleases,
+                ticket.getInjectionVersion(),
+                ticket.getVersionRelation().getFixVersion());
+
+        // nFix: per ogni classe toccata da commit di bug-fix, incrementa solo
+        // le classi la cui release ha data >= data del commit (cumulativo come nRevisions)
+        for (GitCommit commit : relevantCommits) {
+            if (commit.getTouchedPaths() == null || commit.getDate() == null) {
+                continue;
+            }
+
+            for (String path : commit.getTouchedPaths()) {
+                allClasses.stream()
+                        .filter(c -> c.getPath().equals(path))
+                        .filter(c -> {
+                            LocalDate relDate = releaseNameToDate.get(c.getRelease());
+                            return relDate != null && !relDate.isBefore(commit.getDate());
+                        })
+                        .forEach(c -> c.setNFix(c.getNFix() + 1));
+            }
+        }
+
+        return 1;
+    }
+
+    private List<ClassRecord> buildRecords(List<JavaClass> allClasses) {
+        return allClasses.stream()
+                .map(c -> new ClassRecord.Builder()
+                        .setRelease(c.getRelease())
+                        .setClassName(c.getPath())
+                        .setLoc(c.getLoc())
+                        .setCommentLines(c.getCommentLines())
+                        .setNRevisions(c.getNRevisions())
+                        .setNAuth(c.getNAuth())
+                        .setNFix(c.getNFix())
+                        .setLocAdded(c.getLocAdded())
+                        .setMaxLocAdded(c.getMaxLocAdded())
+                        .setAvgLocAdded(c.getAvgLocAdded())
+                        .setChurn(c.getChurn())
+                        .setMaxChurn(c.getMaxChurn())
+                        .setAvgChurn(c.getAvgChurn())
+                        .setLocTouched(c.getLocTouched())
+                        .setChangeSetSize(c.getChangeSetSize())
+                        .setMaxChangeSet(c.getMaxChangeSet())
+                        .setAvgChangeSet(c.getAvgChangeSet())
+                        .setAge(c.getAge())
+                        .setWeightedAge(c.getWeightedAge())
+                        .setCyclomaticComplexity(c.getCyclomaticComplexity())
+                        .setDuplication(c.getDuplication())
+                        .setNBranches(c.getNBranches())
+                        .setMaxNestingDepth(c.getMaxNestingDepth())
+                        .setBuggy(c.isBuggy())
+                        .setNSmells(c.getNSmells())
+                        .build())
+                .toList();
+    }
+
+    private void logSummary(String projectKey,
+                            List<ProjectVersion> windowedReleases,
+                            LocalDate windowStart, LocalDate windowEnd,
+                            List<GitCommit> allCommits, List<GitCommit> commits,
+                            List<JavaClass> allClasses, long classiBuggy,
+                            int ticketsConCommit, long ticketsConIV,
+                            List<ClassRecord> records) {
+
+        long commitsFuoriFinestra = allCommits.size() - commits.size();
+        long commitsConRelease = commits.stream().filter(c -> c.getRelease() != null).count();
+        long commitsSenzaRelease = commits.stream().filter(c -> c.getRelease() == null).count();
+        long classiUniche = allClasses.stream()
+                .map(JavaClass::getName)
+                .distinct()
+                .count();
 
         logger.logInfo("[CONSISTENCY] ============ RIEPILOGO FASE 2 ============");
         logger.logInfo("[CONSISTENCY] Progetto              : " + projectKey);

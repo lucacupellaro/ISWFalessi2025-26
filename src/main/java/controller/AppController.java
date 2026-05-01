@@ -54,6 +54,12 @@ public class AppController {
     }
 
     public List<BugTicketRecord> run() {
+
+
+
+
+
+
         List<BugTicketRecord> results = new ArrayList<>();
         List<ProjectVersion> allVersions = new ArrayList<>();
 

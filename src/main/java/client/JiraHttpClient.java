@@ -7,6 +7,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -28,7 +29,8 @@ public class JiraHttpClient {
     }
 
     public String fetchIssues(String jql, int startAt, int maxResults) {
-        logger.info("[HTTP] Chiamata Jira issues — startAt=" + startAt + " maxResults=" + maxResults);
+        logger.log(Level.INFO, "[HTTP] Chiamata Jira issues — startAt={0} maxResults={1}",
+                new Object[]{startAt, maxResults});
         String url = baseUrl + "/rest/api/2/search"
                 + "?jql=" + URLEncoder.encode(jql, StandardCharsets.UTF_8)
                 + "&startAt=" + startAt

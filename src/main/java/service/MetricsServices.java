@@ -109,7 +109,7 @@ public class MetricsServices {
                     .orElse(releaseDate);
 
             long weeks = ChronoUnit.WEEKS.between(firstTouch, releaseDate);
-            javaClass.setAge((double) weeks);
+            javaClass.setAge(weeks);
 
             // Weighted Age = Σ(weeksBeforeRelease_i * locTouched_i) / totalLocTouched
             long totalLocTouched = 0;
@@ -122,7 +122,7 @@ public class MetricsServices {
                 int locTouched = diff.get(0) + diff.get(1);
                 long weeksBeforeRelease = ChronoUnit.WEEKS.between(commit.getDate(), releaseDate);
 
-                weightedSum += (double) weeksBeforeRelease * locTouched;
+                weightedSum += weeksBeforeRelease * locTouched;
                 totalLocTouched += locTouched;
             }
 
@@ -137,22 +137,13 @@ public class MetricsServices {
 
     private void computeSmells(List<JavaClass> classes, String previousReleaseSha) {
         for (JavaClass javaClass : classes) {
-            // Per la prima release (nessuna release precedente), smell = 0
-            if (previousReleaseSha == null) {
-                javaClass.setNSmells(0);
-                javaClass.setCyclomaticComplexity(0);
-                javaClass.setDuplication(0);
-                continue;
-            }
-
-            // Legge il contenuto della classe all'ultimo commit della release precedente
-            String prevContent = localGitService.readFileContent(previousReleaseSha, javaClass.getPath());
+            // Per la prima release o classe non esistente nella release precedente
+            String prevContent = (previousReleaseSha != null)
+                    ? localGitService.readFileContent(previousReleaseSha, javaClass.getPath())
+                    : null;
 
             if (prevContent == null) {
-                // La classe non esisteva nella release precedente
-                javaClass.setNSmells(0);
-                javaClass.setCyclomaticComplexity(0);
-                javaClass.setDuplication(0);
+                setDefaultSmells(javaClass);
                 continue;
             }
 
@@ -164,11 +155,15 @@ public class MetricsServices {
             } catch (Exception e) {
                 logger.logWarning("PMD error per classe "
                         + javaClass.getName() + " @ release precedente: " + e.getMessage());
-                javaClass.setNSmells(0);
-                javaClass.setCyclomaticComplexity(0);
-                javaClass.setDuplication(0);
+                setDefaultSmells(javaClass);
             }
         }
+    }
+
+    private void setDefaultSmells(JavaClass javaClass) {
+        javaClass.setNSmells(0);
+        javaClass.setCyclomaticComplexity(0);
+        javaClass.setDuplication(0);
     }
 
     // Sostituisci runPmd con questa versione che ritorna più metriche
@@ -230,17 +225,9 @@ public class MetricsServices {
                     continue;
                 }
 
-                if (inBlockComment) {
-                    comments++;
-                    if (trimmed.contains("*/")) {
-                        inBlockComment = false;
-                    }
-                } else if (trimmed.startsWith("/*")) {
-                    comments++;
-                    if (!trimmed.contains("*/")) {
-                        inBlockComment = true;
-                    }
-                } else if (trimmed.startsWith("//")) {
+                LineClassification classification = classifyLine(trimmed, inBlockComment);
+                inBlockComment = classification.inBlockComment();
+                if (classification.isComment()) {
                     comments++;
                 } else {
                     loc++;
@@ -250,6 +237,23 @@ public class MetricsServices {
             javaClass.setLoc(loc);
             javaClass.setCommentLines(comments);
         }
+    }
+
+    private record LineClassification(boolean isComment, boolean inBlockComment) {}
+
+    private LineClassification classifyLine(String trimmed, boolean inBlockComment) {
+        if (inBlockComment) {
+            boolean endsBlock = trimmed.contains("*/");
+            return new LineClassification(true, !endsBlock);
+        }
+        if (trimmed.startsWith("/*")) {
+            boolean singleLineBlock = trimmed.contains("*/");
+            return new LineClassification(true, !singleLineBlock);
+        }
+        if (trimmed.startsWith("//")) {
+            return new LineClassification(true, false);
+        }
+        return new LineClassification(false, false);
     }
 
     // NR — numero di commit che hanno toccato la classe (fino alla release corrente)
@@ -365,50 +369,112 @@ public class MetricsServices {
     }
 
     private int computeMaxNestingDepth(String content) {
-        int maxDepth = 0;
-        int currentDepth = 0;
-        boolean inString = false;
-        boolean inChar = false;
-        boolean inLineComment = false;
-        boolean inBlockComment = false;
+        NestingState state = new NestingState();
 
         for (int i = 0; i < content.length(); i++) {
             char c = content.charAt(i);
             char next = (i + 1 < content.length()) ? content.charAt(i + 1) : 0;
 
-            // Gestione commenti e stringhe per non contare { } falsi
+            int charsToSkip = state.processChar(c, next);
+            i += charsToSkip;
+        }
+        return state.getMaxDepth();
+    }
+
+    /** Mutable state tracker for nesting depth computation. */
+    private static class NestingState {
+        private int maxDepth = 0;
+        private int currentDepth = 0;
+        private boolean inString = false;
+        private boolean inChar = false;
+        private boolean inLineComment = false;
+        private boolean inBlockComment = false;
+
+        int getMaxDepth() {
+            return maxDepth;
+        }
+
+        /**
+         * Processes a character and returns how many additional characters to skip.
+         */
+        int processChar(char c, char next) {
             if (inLineComment) {
-                if (c == '\n') inLineComment = false;
-                continue;
+                return processLineComment(c);
             }
             if (inBlockComment) {
-                if (c == '*' && next == '/') { inBlockComment = false; i++; }
-                continue;
+                return processBlockComment(c, next);
             }
             if (inString) {
-                if (c == '\\') { i++; continue; }
-                if (c == '"') inString = false;
-                continue;
+                return processString(c);
             }
             if (inChar) {
-                if (c == '\\') { i++; continue; }
-                if (c == '\'') inChar = false;
-                continue;
+                return processCharLiteral(c);
             }
+            return processCode(c, next);
+        }
 
-            if (c == '/' && next == '/') { inLineComment = true; continue; }
-            if (c == '/' && next == '*') { inBlockComment = true; continue; }
-            if (c == '"') { inString = true; continue; }
-            if (c == '\'') { inChar = true; continue; }
+        private int processLineComment(char c) {
+            if (c == '\n') {
+                inLineComment = false;
+            }
+            return 0;
+        }
 
+        private int processBlockComment(char c, char next) {
+            if (c == '*' && next == '/') {
+                inBlockComment = false;
+                return 1; // skip the '/'
+            }
+            return 0;
+        }
+
+        private int processString(char c) {
+            if (c == '\\') {
+                return 1; // skip escaped char
+            }
+            if (c == '"') {
+                inString = false;
+            }
+            return 0;
+        }
+
+        private int processCharLiteral(char c) {
+            if (c == '\\') {
+                return 1; // skip escaped char
+            }
+            if (c == '\'') {
+                inChar = false;
+            }
+            return 0;
+        }
+
+        private int processCode(char c, char next) {
+            if (c == '/' && next == '/') {
+                inLineComment = true;
+                return 0;
+            }
+            if (c == '/' && next == '*') {
+                inBlockComment = true;
+                return 0;
+            }
+            if (c == '"') {
+                inString = true;
+                return 0;
+            }
+            if (c == '\'') {
+                inChar = true;
+                return 0;
+            }
             if (c == '{') {
                 currentDepth++;
-                if (currentDepth > maxDepth) maxDepth = currentDepth;
+                if (currentDepth > maxDepth) {
+                    maxDepth = currentDepth;
+                }
             } else if (c == '}') {
                 currentDepth--;
             }
+            return 0;
         }
-        return maxDepth;
     }
 
     private int getMax(List<Integer> list) {

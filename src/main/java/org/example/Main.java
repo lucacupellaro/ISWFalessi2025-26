@@ -17,7 +17,9 @@ import util.PrintOnCsv;
 import util.ProgressLogger;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class Main {
@@ -39,9 +41,9 @@ public class Main {
         } else if (args[0].equals("phase2")) {
             runPhase2(config);
         } else if (args[0].equals("phase3")) {
-            runPhase3(args);
+            runPhase3();
         } else {
-            logger.info("Argomento non riconosciuto: " + args[0]);
+            logger.log(Level.INFO, "Argomento non riconosciuto: {0}", args[0]);
         }
     }
 
@@ -52,9 +54,8 @@ public class Main {
         }
 
         logger.info("Avvio phase1...");
-        logger.info("Si recuperano tutti i ticket del " + percent
-                + "% delle release più vecchie");
-        logger.info("Progetti: " + config.getProjects().stream()
+        logger.log(Level.INFO, "Si recuperano tutti i ticket del {0}% delle release più vecchie", percent);
+        logger.log(Level.INFO, "Progetti: {0}", config.getProjects().stream()
                 .map(p -> p.getKey())
                 .toList());
 
@@ -68,10 +69,10 @@ public class Main {
         PrintOnCsv csvPrinter = new PrintOnCsv();
         csvPrinter.print(records);
 
-        logger.info("Ticket validi recuperati: " + records.size());
+        logger.log(Level.INFO, "Ticket validi recuperati: {0}", records.size());
     }
 
-    private static void runPhase2(AppConfig config) throws Exception {
+    private static void runPhase2(AppConfig config) throws IOException, InterruptedException {
         if (!new File(CSV_PATH).exists()) {
             logger.info("TicketRelease.csv non trovato — eseguire prima phase1");
             return;
@@ -114,22 +115,9 @@ public class Main {
         });
     }
 
-    private static void runPhase3(String[] args) throws Exception {
-
+    private static void runPhase3() throws Exception {
         logger.info("Avvio phase3 — MLWeka Pipeline...");
         MLWekaController controller = new MLWekaController();
-
-       // controller.normalizeDataset()
         controller.normalizeDataset();
-        /*
-        if (args[1].equals("FeatureS")) {
-            controller.runFeatureSelection();
-        } else if (args[1].equals("Balancing")) {
-            controller.runBalancing();
-        }
-        */
-
-
-
     }
 }

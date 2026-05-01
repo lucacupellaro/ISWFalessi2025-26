@@ -12,6 +12,7 @@ import java.util.*;
 
 public class LocalGitService {
 
+    private static final String GIT_DIR_FLAG = "--git-dir";
     private final Path repoDir;
     private final ProgressLogger logger;
 
@@ -38,7 +39,7 @@ public class LocalGitService {
     public List<GitCommit> fetchAllCommits() throws IOException, InterruptedException {
         // Formato: SHA|autore|data|messaggio (una riga), seguiti dalle righe numstat
         // Il separatore "---COMMIT---" delimita i commit
-        String output = runGit("git", "--git-dir", repoDir.toString(),
+        String output = runGit("git", GIT_DIR_FLAG, repoDir.toString(),
                 "log", "--all", "--numstat",
                 "--format=---COMMIT---%n%H|%an|%ad|%s", "--date=short");
 
@@ -46,66 +47,98 @@ public class LocalGitService {
         String[] blocks = output.split("---COMMIT---");
 
         for (String block : blocks) {
-            block = block.trim();
-            if (block.isEmpty()) continue;
-
-            String[] lines = block.split("\n");
-            if (lines.length == 0) continue;
-
-            // Prima riga: SHA|autore|data|messaggio
-            String header = lines[0].trim();
-            String[] parts = header.split("\\|", 4);
-            if (parts.length < 4) continue;
-
-            String sha = parts[0];
-            String author = parts[1];
-            String dateStr = parts[2];
-            String message = parts[3];
-
-            LocalDate date;
-            try {
-                date = LocalDate.parse(dateStr);
-            } catch (Exception e) {
-                continue;
+            GitCommit commit = parseCommitBlock(block);
+            if (commit != null) {
+                commits.add(commit);
             }
-
-            GitCommit commit = new GitCommit(sha, message, date);
-            commit.setAuthor(author);
-
-            // Righe successive: numstat -> "added\tremoved\tpath"
-            List<String> touchedPaths = new ArrayList<>();
-            Map<String, List<Integer>> fileDiffs = new HashMap<>();
-
-            for (int i = 1; i < lines.length; i++) {
-                String line = lines[i].trim();
-                if (line.isEmpty()) continue;
-
-                String[] statParts = line.split("\t");
-                if (statParts.length < 3) continue;
-
-                String path = statParts[2];
-                if (!path.endsWith(".java") || path.contains("/test/")) continue;
-
-                // "-" indica file binari, li trattiamo come 0
-                int added = statParts[0].equals("-") ? 0 : Integer.parseInt(statParts[0]);
-                int removed = statParts[1].equals("-") ? 0 : Integer.parseInt(statParts[1]);
-
-                touchedPaths.add(path);
-                fileDiffs.put(path, List.of(added, removed));
-            }
-
-            commit.setTouchedPaths(touchedPaths);
-            commit.setFileDiffs(fileDiffs);
-            commits.add(commit);
         }
 
         logger.logInfo("Commit letti dal repo locale: " + commits.size());
         return commits;
     }
 
+    /**
+     * Parsa un singolo blocco di testo (header + righe numstat) e restituisce
+     * un GitCommit, oppure null se il blocco non è valido.
+     */
+    private GitCommit parseCommitBlock(String block) {
+        block = block.trim();
+        if (block.isEmpty()) {
+            return null;
+        }
+
+        String[] lines = block.split("\n");
+        if (lines.length == 0) {
+            return null;
+        }
+
+        // Prima riga: SHA|autore|data|messaggio
+        String header = lines[0].trim();
+        String[] parts = header.split("\\|", 4);
+        if (parts.length < 4) {
+            return null;
+        }
+
+        String sha = parts[0];
+        String author = parts[1];
+        String dateStr = parts[2];
+        String message = parts[3];
+
+        LocalDate date;
+        try {
+            date = LocalDate.parse(dateStr);
+        } catch (Exception e) {
+            return null;
+        }
+
+        GitCommit commit = new GitCommit(sha, message, date);
+        commit.setAuthor(author);
+
+        // Righe successive: numstat -> "added\tremoved\tpath"
+        parseNumstatLines(lines, commit);
+
+        return commit;
+    }
+
+    /**
+     * Parsa le righe numstat (dalla seconda riga in poi) e popola
+     * touchedPaths e fileDiffs del commit.
+     */
+    private void parseNumstatLines(String[] lines, GitCommit commit) {
+        List<String> touchedPaths = new ArrayList<>();
+        Map<String, List<Integer>> fileDiffs = new HashMap<>();
+
+        for (int i = 1; i < lines.length; i++) {
+            String line = lines[i].trim();
+            if (line.isEmpty()) {
+                continue;
+            }
+
+            String[] statParts = line.split("\t");
+            if (statParts.length < 3) {
+                continue;
+            }
+
+            String path = statParts[2];
+            if (!path.endsWith(".java") || path.contains("/test/")) {
+                continue;
+            }
+
+            // "-" indica file binari, li trattiamo come 0
+            int added = statParts[0].equals("-") ? 0 : Integer.parseInt(statParts[0]);
+            int removed = statParts[1].equals("-") ? 0 : Integer.parseInt(statParts[1]);
+
+            touchedPaths.add(path);
+            fileDiffs.put(path, List.of(added, removed));
+        }
+
+        commit.setTouchedPaths(touchedPaths);
+        commit.setFileDiffs(fileDiffs);
+    }
+
     /** Elenca tutti i file .java (esclusi i test) presenti al commit indicato. */
     public List<String> listJavaFiles(String sha) throws IOException, InterruptedException {
-        String output = runGit("git", "--git-dir", repoDir.toString(),
+        String output = runGit("git", GIT_DIR_FLAG, repoDir.toString(),
                 "ls-tree", "-r", "--name-only", sha);
 
         List<String> classes = new ArrayList<>();
@@ -121,7 +154,7 @@ public class LocalGitService {
     /** Legge il contenuto di un file a un dato commit. */
     public String readFileContent(String sha, String path) {
         try {
-            return runGit("git", "--git-dir", repoDir.toString(),
+            return runGit("git", GIT_DIR_FLAG, repoDir.toString(),
                     "show", sha + ":" + path);
         } catch (Exception e) {
             logger.logWarning("Errore lettura locale " + path + " @ " + sha + ": " + e.getMessage());

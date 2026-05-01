@@ -21,6 +21,10 @@ public class GitHubCommitClient {
     private static final String BASE_URL = "https://api.github.com/repos/apache/%s/commits";
     private static final int PER_PAGE = 100;
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String AUTH_HEADER = "Authorization";
+    private static final String BEARER_PREFIX = "Bearer ";
+    private static final String ACCEPT_HEADER = "Accept";
+    private static final String GITHUB_JSON = "application/vnd.github+json";
 
     private final HttpClient httpClient;
     private final String token;
@@ -36,15 +40,16 @@ public class GitHubCommitClient {
     public List<JsonNode> fetchAllCommits(ProjectConfig projectConfig) throws IOException, InterruptedException {
         List<JsonNode> allCommits = new ArrayList<>();
         int page = 1;
+        boolean hasMore = true;
 
-        while (true) {
+        while (hasMore) {
             String url = String.format(BASE_URL + "?per_page=%d&page=%d",
                     projectConfig.getRepoName(), PER_PAGE, page);
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
-                    .header("Authorization", "Bearer " + token)
-                    .header("Accept", "application/vnd.github+json")
+                    .header(AUTH_HEADER, BEARER_PREFIX + token)
+                    .header(ACCEPT_HEADER, GITHUB_JSON)
                     .GET()
                     .build();
 
@@ -53,18 +58,18 @@ public class GitHubCommitClient {
 
             if (response.statusCode() != 200) {
                 logger.logWarning("GitHub API error: " + response.statusCode());
-                break;
+                hasMore = false;
+            } else {
+                JsonNode commits = MAPPER.readTree(response.body());
+
+                if (!commits.isArray() || commits.isEmpty()) {
+                    hasMore = false;
+                } else {
+                    commits.forEach(allCommits::add);
+                    logger.logInfo("Fetched page " + page + " — total commits so far: " + allCommits.size());
+                    page++;
+                }
             }
-
-            JsonNode commits = MAPPER.readTree(response.body());
-
-            if (!commits.isArray() || commits.isEmpty()) {
-                break;
-            }
-
-            commits.forEach(allCommits::add);
-            logger.logInfo("Fetched page " + page + " — total commits so far: " + allCommits.size());
-            page++;
         }
 
         return allCommits;

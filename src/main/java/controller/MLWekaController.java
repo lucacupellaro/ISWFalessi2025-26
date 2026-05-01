@@ -1,9 +1,10 @@
 package controller;
 
-import MLWeka.DataEngeneering;
-import MLWeka.WekaConfig;
+import mlweka.DataEngeneering;
+import mlweka.WekaConfig;
 import weka.core.Instances;
 
+import java.io.IOException;
 import java.util.logging.Logger;
 
 public class MLWekaController {
@@ -15,7 +16,7 @@ public class MLWekaController {
     private final DataEngeneering dataEng = new DataEngeneering();
 
 
-    public void normalizeDataset() throws Exception {
+    public void normalizeDataset() throws IOException {
         logger.info("=== Avvio Normalizzazione Z-Score ===");
         Instances data = WekaConfig.loadDataset(DATASET_PATH,false);
         Instances normalized = dataEng.normalizeMinMax(data);

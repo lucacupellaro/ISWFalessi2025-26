@@ -14,6 +14,24 @@ public class ConsistencyService {
     public String getDiscardReason(BugTicket ticket,
                                    VersionRelation versionRelation,
                                    List<ProjectVersion> allowedVersions) {
+        String reason;
+
+        reason = checkDates(ticket);
+        if (reason != null) return reason;
+
+        reason = checkFixVersion(ticket, versionRelation, allowedVersions);
+        if (reason != null) return reason;
+
+        reason = checkInjectionVersion(versionRelation);
+        if (reason != null) return reason;
+
+        reason = checkAffectedVersions(versionRelation);
+        if (reason != null) return reason;
+
+        return null;
+    }
+
+    private String checkDates(BugTicket ticket) {
         if (ticket.getCreationDate() == null) {
             return "creationDate mancante";
         }
@@ -23,6 +41,12 @@ public class ConsistencyService {
         if (ticket.getResolutionDate().isBefore(ticket.getCreationDate())) {
             return "resolutionDate precedente a creationDate";
         }
+        return null;
+    }
+
+    private String checkFixVersion(BugTicket ticket,
+                                   VersionRelation versionRelation,
+                                   List<ProjectVersion> allowedVersions) {
         if (versionRelation.getFixVersion() == null) {
             return "fixVersion mancante";
         }
@@ -69,8 +93,13 @@ public class ConsistencyService {
             return FIX_VERSION + " '" + fixName + "' non è nelle versioni ammesse";
         }
 
+        return null;
+    }
+
+    private String checkInjectionVersion(VersionRelation versionRelation) {
         // Il controllo verifica che la injection version sia stata rilasciata prima della fix version E non puo stare dopo la OV
         ProjectVersion iv = versionRelation.getInjectionVersion();
+        ProjectVersion fix = versionRelation.getFixVersion();
         if (iv != null && iv.getReleaseDate() != null) {
             if (iv.getReleaseDate().isAfter(fix.getReleaseDate())) {
                 return "injectionVersion '" + iv.getName()
@@ -82,9 +111,14 @@ public class ConsistencyService {
                         + "' rilasciata dopo la openingVersion '" + ov.getName() + "'";
             }
         }
+        return null;
+    }
 
+    private String checkAffectedVersions(VersionRelation versionRelation) {
         // le affectedVersions devono avere releaseDate compresa nell'intervallo [IV, FV)
         // se una affected ha data anomala (fuori intervallo) il ticket viene scartato
+        ProjectVersion iv = versionRelation.getInjectionVersion();
+        ProjectVersion fix = versionRelation.getFixVersion();
         if (iv != null && iv.getReleaseDate() != null) {
             for (ProjectVersion affected : versionRelation.getAffectedVersions()) {
                 if (affected.getReleaseDate() == null) {
@@ -100,7 +134,6 @@ public class ConsistencyService {
                 }
             }
         }
-
         return null;
     }
 }

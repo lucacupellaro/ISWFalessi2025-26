@@ -1,4 +1,4 @@
-package MLWeka;
+package mlweka;
 
 import weka.core.Instances;
 import weka.core.converters.CSVLoader;
@@ -7,6 +7,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class WekaConfig {
@@ -30,8 +31,8 @@ public class WekaConfig {
         // Imposta l'ultima colonna (buggy) come classe
         data.setClassIndex(data.numAttributes() - 1);
 
-        logger.info("Dataset caricato: " + data.numInstances() + " istanze, "
-                + data.numAttributes() + " attributi (classe: " + data.classAttribute().name() + ")");
+        logger.log(Level.INFO, "Dataset caricato: {0} istanze, {1} attributi (classe: {2})",
+                new Object[]{data.numInstances(), data.numAttributes(), data.classAttribute().name()});
 
         return data;
     }
@@ -59,6 +60,6 @@ public class WekaConfig {
                 writer.newLine();
             }
         }
-        logger.info("Dataset salvato in: " + path);
+        logger.log(Level.INFO, "Dataset salvato in: {0}", path);
     }
 }
