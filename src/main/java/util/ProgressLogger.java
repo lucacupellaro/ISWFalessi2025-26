@@ -37,4 +37,12 @@ public class ProgressLogger {
     public void logProportionComputed(double p) {
         System.out.println("[PROPORTION] Valore P calcolato: " + String.format("%.4f", p));
     }
+
+    public void logInfo(String message) {
+        System.out.println("[INFO] " + message);
+    }
+
+    public void logWarning(String message) {
+        System.out.println("[WARN] " + message);
+    }
 }

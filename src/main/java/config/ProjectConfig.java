@@ -8,6 +8,10 @@ public class ProjectConfig {
 
     private String key;
     private String jql;
+    private String repoName;
+
+    public String getRepoName() { return repoName; }
+    public void setRepoName(String repoName) { this.repoName = repoName; }
 
     public ProjectConfig() {}
 

@@ -61,12 +61,44 @@ public class ConsistencyService {
             }
         }
 
-        // la fix version deve essere tra le versioni ammesse
+        // la fix version deve essere tra le versioni ammesse, se non lo è viene scartata
         String fixName = fix.getName();
         boolean fixInAllowed = allowedVersions.stream()
                 .anyMatch(v -> v.getName().equals(fixName));
         if (!fixInAllowed) {
             return "fixVersion '" + fixName + "' non è nelle versioni ammesse";
+        }
+
+        // Il controllo verifica che la injection version sia stata rilasciata prima della fix version E non puo stare dopo la OV
+        ProjectVersion iv = versionRelation.getInjectionVersion();
+        if (iv != null && iv.getReleaseDate() != null) {
+            if (iv.getReleaseDate().isAfter(fix.getReleaseDate())) {
+                return "injectionVersion '" + iv.getName()
+                        + "' rilasciata dopo la fixVersion '" + fix.getName() + "'";
+            }
+            ProjectVersion ov = versionRelation.getOpeningVersion();
+            if (ov != null && iv.getReleaseDate().isAfter(ov.getReleaseDate())) {
+                return "injectionVersion '" + iv.getName()
+                        + "' rilasciata dopo la openingVersion '" + ov.getName() + "'";
+            }
+        }
+
+        // le affectedVersions devono avere releaseDate compresa nell'intervallo [IV, FV)
+        // se una affected ha data anomala (fuori intervallo) il ticket viene scartato
+        if (iv != null && iv.getReleaseDate() != null) {
+            for (ProjectVersion affected : versionRelation.getAffectedVersions()) {
+                if (affected.getReleaseDate() == null) {
+                    continue; // affected senza data, la saltiamo
+                }
+                boolean afterOrAtIv = !affected.getReleaseDate().isBefore(iv.getReleaseDate());
+                boolean beforeFix = affected.getReleaseDate().isBefore(fix.getReleaseDate());
+                if (!afterOrAtIv || !beforeFix) {
+                    return "affectedVersion '" + affected.getName()
+                            + "' con releaseDate " + affected.getReleaseDate()
+                            + " fuori dall'intervallo [IV=" + iv.getName()
+                            + ", FV=" + fix.getName() + ")";
+                }
+            }
         }
 
         return null;

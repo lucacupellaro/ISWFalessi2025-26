@@ -15,11 +15,12 @@ import java.util.List;
  */
 public class PrintOnCsv {
 
-    private static final String FILE_NAME = "TicketRelease.csv";
+    private static final String FILE_NAME = "src/main/java/file/TicketRelease.csv";
     private static final String SEPARATOR = ",";
     private static final String HEADER = String.join(SEPARATOR,
             "projectKey",
             "idTicket",
+            "ticketKey",
             "creationDateTicket",
             "resolutionDateTicket",
             "fixVersion",
@@ -57,6 +58,7 @@ public class PrintOnCsv {
         return String.join(SEPARATOR,
                 safe(r.getProjectKey()),
                 safe(r.getId()),
+                safe(r.getTicketKey()),
                 safe(r.getCreationDate() != null ? r.getCreationDate().toString() : null),
                 safe(r.getResolutionDate() != null ? r.getResolutionDate().toString() : null),
                 safe(r.getFixVersionName()),

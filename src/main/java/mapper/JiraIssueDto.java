@@ -13,6 +13,11 @@ import java.util.List;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class JiraIssueDto {
 
+    @JsonProperty("key")
+    private String key;
+
+    public String getKey() { return key; }
+
     @JsonProperty("id")
     private String id;
 

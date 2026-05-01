@@ -38,9 +38,11 @@ public class ProportionCalculator {
 
         for (BugTicketRecord record : withIv) {
             Double p = computeSingleP(record, versions);
+
             if (p != null) {
                 sum += p;
                 count++;
+               // System.out.println("Al ticket i:"+count+", il valore di p: "+p+" il p medio fino al ticket i è:"+sum/count);
             }
         }
 
