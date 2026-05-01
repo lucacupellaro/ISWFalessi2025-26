@@ -24,7 +24,7 @@
 @attribute nBranches numeric
 @attribute maxNestingDepth numeric
 @attribute nSmells numeric
-@attribute buggy {no,yes}
+@attribute buggy {yes,no}
 
 @data
 3.0.1,src/java/jmx/org/apache/zookeeper/jmx/CommonNames.java,0.002283,0.02381,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,no
