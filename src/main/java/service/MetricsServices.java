@@ -16,9 +16,11 @@ import java.util.*;
 public class MetricsServices {
 
     private final ProgressLogger logger;
+    private final LocalGitService localGitService;
 
-    public MetricsServices(ProgressLogger logger) {
+    public MetricsServices(ProgressLogger logger, LocalGitService localGitService) {
         this.logger = logger;
+        this.localGitService = localGitService;
     }
 
     // Classe privata dentro MetricsServices
@@ -26,7 +28,8 @@ public class MetricsServices {
 
     public void computeAllMetrics(List<JavaClass> classes,
                                   List<GitCommit> commits,
-                                  ProjectVersion release) {
+                                  ProjectVersion release,
+                                  String previousReleaseSha) {
 
         List<GitCommit> releaseCommits = commits.stream()
                 .filter(c -> c.getDate() != null
@@ -40,7 +43,7 @@ public class MetricsServices {
         computeChangeSet(classes, releaseCommits);
         computeAge(classes, releaseCommits, release);
         computeStructuralMetrics(classes);
-        computeSmells(classes);
+        computeSmells(classes, previousReleaseSha);
     }
 
     // Change Set Size: numero di file committati insieme nei commit che toccano la classe
@@ -132,22 +135,35 @@ public class MetricsServices {
         }
     }
 
-    private void computeSmells(List<JavaClass> classes) {
+    private void computeSmells(List<JavaClass> classes, String previousReleaseSha) {
         for (JavaClass javaClass : classes) {
-            if (javaClass.getContent() == null) {
+            // Per la prima release (nessuna release precedente), smell = 0
+            if (previousReleaseSha == null) {
                 javaClass.setNSmells(0);
                 javaClass.setCyclomaticComplexity(0);
                 javaClass.setDuplication(0);
                 continue;
             }
+
+            // Legge il contenuto della classe all'ultimo commit della release precedente
+            String prevContent = localGitService.readFileContent(previousReleaseSha, javaClass.getPath());
+
+            if (prevContent == null) {
+                // La classe non esisteva nella release precedente
+                javaClass.setNSmells(0);
+                javaClass.setCyclomaticComplexity(0);
+                javaClass.setDuplication(0);
+                continue;
+            }
+
             try {
-                PmdMetrics metrics = runPmd(javaClass.getContent(), javaClass.getName());
+                PmdMetrics metrics = runPmd(prevContent, javaClass.getName());
                 javaClass.setNSmells(metrics.smells());
                 javaClass.setCyclomaticComplexity(metrics.cyclomaticComplexity());
                 javaClass.setDuplication(metrics.duplication());
             } catch (Exception e) {
                 logger.logWarning("PMD error per classe "
-                        + javaClass.getName() + ": " + e.getMessage());
+                        + javaClass.getName() + " @ release precedente: " + e.getMessage());
                 javaClass.setNSmells(0);
                 javaClass.setCyclomaticComplexity(0);
                 javaClass.setDuplication(0);

@@ -3,7 +3,9 @@ package MLWeka;
 import weka.core.Instances;
 import weka.core.converters.CSVLoader;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.logging.Logger;
 
@@ -12,14 +14,6 @@ public class WekaConfig {
     private static final Logger logger = Logger.getLogger(WekaConfig.class.getName());
 
     private WekaConfig() {
-    }
-
-    /**
-     * Carica il CSV come Instances di Weka, rimuove le colonne non-feature
-     * (release e className) e imposta "buggy" come classe.
-     */
-    public static Instances loadDataset(String csvPath) throws IOException {
-        return loadDataset(csvPath, true);
     }
 
     public static Instances loadDataset(String csvPath, boolean removeIdentifiers) throws IOException {
@@ -40,5 +34,31 @@ public class WekaConfig {
                 + data.numAttributes() + " attributi (classe: " + data.classAttribute().name() + ")");
 
         return data;
+    }
+
+    public static void saveToCsv(Instances data, String path) throws IOException {
+        File file = new File(path);
+        file.getParentFile().mkdirs();
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+            StringBuilder header = new StringBuilder();
+            for (int i = 0; i < data.numAttributes(); i++) {
+                if (i > 0) header.append(",");
+                header.append(data.attribute(i).name());
+            }
+            writer.write(header.toString());
+            writer.newLine();
+
+            for (int i = 0; i < data.numInstances(); i++) {
+                StringBuilder row = new StringBuilder();
+                for (int j = 0; j < data.numAttributes(); j++) {
+                    if (j > 0) row.append(",");
+                    row.append(data.instance(i).toString(j));
+                }
+                writer.write(row.toString());
+                writer.newLine();
+            }
+        }
+        logger.info("Dataset salvato in: " + path);
     }
 }

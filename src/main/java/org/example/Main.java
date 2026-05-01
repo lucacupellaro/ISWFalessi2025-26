@@ -87,7 +87,7 @@ public class Main {
         String repoName = config.getProjects().get(0).getRepoName();
         LocalGitService localGitService = new LocalGitService(repoName, logger);
         ClassExtractorService classExtractorService = new ClassExtractorService(localGitService, logger);
-        MetricsServices metricsServices = new MetricsServices(logger);
+        MetricsServices metricsServices = new MetricsServices(logger, localGitService);
         LabelingService labelingService = new LabelingService();
         PrintDatasetCsv printDatasetCsv = new PrintDatasetCsv();
 
@@ -118,7 +118,7 @@ public class Main {
         MLWekaController controller = new MLWekaController();
 
        // controller.normalizeDataset()
-        controller.normalizeDatasetShuffled();
+        controller.normalizeDataset();
         /*
         if (args[1].equals("FeatureS")) {
             controller.runFeatureSelection();

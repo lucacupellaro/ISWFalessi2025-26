@@ -99,11 +99,20 @@ public class Phase2Controller {
         logger.logInfo("Estrazione classi e calcolo metriche per release...");
         List<JavaClass> allClasses = new ArrayList<>();
 
-        for (ProjectVersion release : windowedReleases) {
+        for (int i = 0; i < windowedReleases.size(); i++) {
+            ProjectVersion release = windowedReleases.get(i);
+
             List<JavaClass> classes = classExtractorService
                     .extractClassesForRelease(release, commits, repoName);
 
-            metricsServices.computeAllMetrics(classes, commits, release);
+            // Trova lo SHA dell'ultimo commit della release precedente (null per la prima)
+            String previousReleaseSha = null;
+            if (i > 0) {
+                ProjectVersion prevRelease = windowedReleases.get(i - 1);
+                previousReleaseSha = findLastCommitSha(allCommits, prevRelease);
+            }
+
+            metricsServices.computeAllMetrics(classes, commits, release, previousReleaseSha);
 
             logger.logInfo("[CONSISTENCY] Release " + release.getName()
                     + " -> classi estratte: " + classes.size());
@@ -249,6 +258,15 @@ public class Phase2Controller {
                 + "/" + ticketsConIV + " con IV");
         logger.logInfo("[CONSISTENCY] Record CSV scritti    : " + records.size());
         logger.logInfo("[CONSISTENCY] ==========================================");
+    }
+
+    // Trova lo SHA dell'ultimo commit prima o uguale alla data di release
+    private String findLastCommitSha(List<GitCommit> commits, ProjectVersion release) {
+        return commits.stream()
+                .filter(c -> c.getDate() != null && !c.getDate().isAfter(release.getReleaseDate()))
+                .max((a, b) -> a.getDate().compareTo(b.getDate()))
+                .map(GitCommit::getSha)
+                .orElse(null);
     }
 
     // Assegna un commit alla release che esso contribuisce a costruire:
