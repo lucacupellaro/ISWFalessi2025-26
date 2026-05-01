@@ -5,6 +5,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Base64;
+import java.util.logging.Logger;
 
 /**
  * Esegue la chiamata HTTP verso Jira per recuperare le versioni di un progetto.
@@ -12,6 +13,7 @@ import java.util.Base64;
  */
 public class JiraVersionClient {
 
+    private static final Logger logger = Logger.getLogger(JiraVersionClient.class.getName());
     private final String baseUrl;
     private final String authHeader;
     private final HttpClient httpClient;
@@ -24,7 +26,7 @@ public class JiraVersionClient {
     }
 
     public String fetchVersions(String projectKey) {
-        System.out.println("[HTTP] Chiamata Jira versioni — progetto: " + projectKey);
+        logger.info("[HTTP] Chiamata Jira versioni — progetto: " + projectKey);
 
 
         String url = baseUrl + "/rest/api/2/project/" + projectKey + "/versions";

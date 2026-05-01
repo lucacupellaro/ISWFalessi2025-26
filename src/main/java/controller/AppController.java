@@ -93,31 +93,27 @@ public class AppController {
         logger.logProjectStart(project.getKey());
         logger.logVersionsLoaded(project.getKey(), allowedVersions.size());
 
-        while (true) {
+        boolean hasMore = true;
+        while (hasMore) {
             String json = issueClient.fetchIssues(project.getJql(), startAt, pageSize);
             JsonNode root = parseJson(json);
             List<JiraIssueDto> dtos = parseIssues(root);
 
             if (dtos.isEmpty()) {
-                break;
-            }
+                hasMore = false;
+            } else {
+                int total = parseTotalAvailable(root);
+                int maxAllowed = config.resolvedMaxTickets(total);
 
-            int total = parseTotalAvailable(root);
-            int maxAllowed = config.resolvedMaxTickets(total);
+                logger.logPageFetched(project.getKey(), startAt, fetched, maxAllowed);
 
-            logger.logPageFetched(project.getKey(), startAt, fetched, maxAllowed);
-
-            for (JiraIssueDto dto : dtos) {
-                if (fetched >= maxAllowed) {
-                    break;
+                for (int i = 0; i < dtos.size() && fetched < maxAllowed; i++) {
+                    fetched += processTicket(dtos.get(i), allowedVersions, project.getKey(), records);
                 }
-                fetched += processTicket(dto, allowedVersions, project.getKey(), records);
-            }
 
-            if (fetched >= maxAllowed || dtos.size() < pageSize) {
-                break;
+                hasMore = fetched < maxAllowed && dtos.size() >= pageSize;
+                startAt += pageSize;
             }
-            startAt += pageSize;
         }
 
         logger.logProjectDone(project.getKey(), records.size());

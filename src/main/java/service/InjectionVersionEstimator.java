@@ -17,37 +17,37 @@ public class InjectionVersionEstimator {
 
     /**
      * Restituisce un nuovo BugTicketRecord con la IV stimata dentro VersionRelation.
-     * Se FV o OV non sono trovati nella lista, restituisce il record invariato.
-     * Se la IV stimata risulta successiva alla FV, restituisce il record invariato.
+     * Se FV o OV non sono trovati nella lista, restituisce il ticketRecord invariato.
+     * Se la IV stimata risulta successiva alla FV, restituisce il ticketRecord invariato.
      *
-     * @param record   ticket senza affected versions
+     * @param ticketRecord   ticket senza affected versions
      * @param p        valore di P calcolato da ProportionCalculator
      * @param versions lista ordinata delle versioni ammesse
-     * @return nuovo BugTicketRecord con IV stimata, oppure il record originale se non stimabile
+     * @return nuovo BugTicketRecord con IV stimata, oppure il ticketRecord originale se non stimabile
      */
-    public BugTicketRecord estimateIv(BugTicketRecord record,
+    public BugTicketRecord estimateIv(BugTicketRecord ticketRecord,
                                       double p,
                                       List<ProjectVersion> versions) {
-        int fvIndex = indexOf(versions, record.getFixVersionName());
-        int ovIndex = indexOf(versions, record.getOpeningVersionName());
+        int fvIndex = indexOf(versions, ticketRecord.getFixVersionName());
+        int ovIndex = indexOf(versions, ticketRecord.getOpeningVersionName());
 
         if (fvIndex < 0 || ovIndex < 0) {
-            return record;
+            return ticketRecord;
         }
 
         int ivIndex = (int) Math.floor(fvIndex - p * (fvIndex - ovIndex));
-        ivIndex = Math.max(0, Math.min(ivIndex, versions.size() - 1));
+        ivIndex = Math.clamp(ivIndex, 0, versions.size() - 1);
 
         ProjectVersion estimatedIv = versions.get(ivIndex);
-        ProjectVersion fix = record.getVersionRelation().getFixVersion();
+        ProjectVersion fix = ticketRecord.getVersionRelation().getFixVersion();
 
         if (estimatedIv.getReleaseDate().isAfter(fix.getReleaseDate())) {
-            return record;
+            return ticketRecord;
         }
 
-        ProjectVersion ov = record.getVersionRelation().getOpeningVersion();
+        ProjectVersion ov = ticketRecord.getVersionRelation().getOpeningVersion();
         if (ov != null && estimatedIv.getReleaseDate().isAfter(ov.getReleaseDate())) {
-            return record;
+            return ticketRecord;
         }
 
         List<ProjectVersion> estimatedAffected = versions.subList(ivIndex, fvIndex);
@@ -55,11 +55,11 @@ public class InjectionVersionEstimator {
         VersionRelation enriched = new VersionRelation(
                 fix,
                 estimatedAffected,
-                record.getVersionRelation().getOpeningVersion(),
+                ticketRecord.getVersionRelation().getOpeningVersion(),
                 estimatedIv
         );
 
-        return new BugTicketRecord(record.toBugTicket(), enriched, record.getProjectKey());
+        return new BugTicketRecord(ticketRecord.toBugTicket(), enriched, ticketRecord.getProjectKey());
     }
 
     private int indexOf(List<ProjectVersion> versions, String name) {

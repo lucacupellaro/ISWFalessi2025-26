@@ -6,6 +6,7 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
+import java.util.logging.Logger;
 
 /**
  * Scrive la lista di BugTicketRecord su un file CSV.
@@ -15,6 +16,7 @@ import java.util.List;
  */
 public class PrintOnCsv {
 
+    private static final Logger logger = Logger.getLogger(PrintOnCsv.class.getName());
     private static final String FILE_NAME = "src/main/java/file/TicketRelease.csv";
     private static final String SEPARATOR = ",";
     private static final String HEADER = String.join(SEPARATOR,
@@ -43,7 +45,7 @@ public class PrintOnCsv {
                 writer.newLine();
             }
 
-            System.out.println("[CSV] Scritti " + records.size() + " record su " + FILE_NAME);
+            logger.info("[CSV] Scritti " + records.size() + " record su " + FILE_NAME);
 
         } catch (IOException e) {
             throw new IllegalStateException("Errore scrittura CSV: " + e.getMessage(), e);
