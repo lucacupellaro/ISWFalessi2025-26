@@ -20,12 +20,12 @@ public class ProportionCalculator {
      * Calcola P come media dei valori individuali di tutti i ticket
      * che hanno almeno una affected version (IV nota).
      *
-     * @param records  lista completa di BugTicketRecord
+     * @param ticketRecords  lista completa di BugTicketRecord
      * @param versions lista ordinata delle versioni ammesse (indice = posizione cronologica)
      * @return valore medio di P, oppure 0.0 se nessun ticket ha IV nota
      */
-    public double computeP(List<BugTicketRecord> records, List<ProjectVersion> versions) {
-        List<BugTicketRecord> withIv = records.stream()
+    public double computeP(List<BugTicketRecord> ticketRecords, List<ProjectVersion> versions) {
+        List<BugTicketRecord> withIv = ticketRecords.stream()
                 .filter(r -> r.getVersionRelation().hasAffectedVersions())
                 .toList();
 
@@ -36,8 +36,8 @@ public class ProportionCalculator {
         double sum = 0.0;
         int count = 0;
 
-        for (BugTicketRecord record : withIv) {
-            Double p = computeSingleP(record, versions);
+        for (BugTicketRecord ticketRecord : withIv) {
+            Double p = computeSingleP(ticketRecord, versions);
 
             if (p != null) {
                 sum += p;
@@ -53,10 +53,10 @@ public class ProportionCalculator {
      * Calcola P per un singolo ticket.
      * Restituisce null se gli indici non sono validi o il denominatore è zero.
      */
-    private Double computeSingleP(BugTicketRecord record, List<ProjectVersion> versions) {
-        int fvIndex = indexOf(versions, record.getFixVersionName());
-        int ovIndex = indexOf(versions, record.getOpeningVersionName());
-        int ivIndex = indexOf(versions, record.getInjectionVersionName());
+    private Double computeSingleP(BugTicketRecord ticketRecord, List<ProjectVersion> versions) {
+        int fvIndex = indexOf(versions, ticketRecord.getFixVersionName());
+        int ovIndex = indexOf(versions, ticketRecord.getOpeningVersionName());
+        int ivIndex = indexOf(versions, ticketRecord.getInjectionVersionName());
 
         if (fvIndex < 0 || ovIndex < 0 || ivIndex < 0) {
             return null;

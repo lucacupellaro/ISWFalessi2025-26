@@ -1,48 +1,52 @@
 package util;
 
+import java.util.logging.Logger;
+
 /**
  * Centralizza i messaggi di log durante l'elaborazione dei progetti Jira.
  */
 public class ProgressLogger {
 
+    private static final Logger logger = Logger.getLogger(ProgressLogger.class.getName());
+
     public void logProjectStart(String projectKey) {
-        System.out.println("[" + projectKey + "] Inizio elaborazione progetto");
+        logger.info("[" + projectKey + "] Inizio elaborazione progetto");
     }
 
     public void logVersionsLoaded(String projectKey, int count) {
-        System.out.println("[" + projectKey + "] Versioni ammesse caricate: " + count);
+        logger.info("[" + projectKey + "] Versioni ammesse caricate: " + count);
     }
 
     public void logPageFetched(String projectKey, int startAt, int fetched, int maxAllowed) {
-        System.out.println("[" + projectKey + "] Pagina startAt=" + startAt
+        logger.info("[" + projectKey + "] Pagina startAt=" + startAt
                 + " — validi finora: " + fetched + "/" + maxAllowed);
     }
 
     public void logTicketValid(String ticketId) {
-        System.out.println("  [OK] " + ticketId);
+        logger.info("  [OK] " + ticketId);
     }
 
     public void logTicketDiscarded(String ticketId, String reason) {
-        System.out.println("  [SCARTATO] " + ticketId + " — " + reason);
+        logger.info("  [SCARTATO] " + ticketId + " — " + reason);
     }
 
     public void logProjectDone(String projectKey, int count) {
-        System.out.println("[" + projectKey + "] Fine elaborazione — ticket validi: " + count);
+        logger.info("[" + projectKey + "] Fine elaborazione — ticket validi: " + count);
     }
 
     public void logGlobalDone(int total) {
-        System.out.println("Elaborazione completata. Totale ticket validi: " + total);
+        logger.info("Elaborazione completata. Totale ticket validi: " + total);
     }
 
     public void logProportionComputed(double p) {
-        System.out.println("[PROPORTION] Valore P calcolato: " + String.format("%.4f", p));
+        logger.info("[PROPORTION] Valore P calcolato: " + String.format("%.4f", p));
     }
 
     public void logInfo(String message) {
-        System.out.println("[INFO] " + message);
+        logger.info("[INFO] " + message);
     }
 
     public void logWarning(String message) {
-        System.out.println("[WARN] " + message);
+        logger.warning("[WARN] " + message);
     }
 }
