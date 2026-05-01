@@ -9,7 +9,7 @@ import java.util.List;
 
 public class ConsistencyService {
 
-
+    private static final String FIX_VERSION = "fixVersion";
 
     public String getDiscardReason(BugTicket ticket,
                                    VersionRelation versionRelation,
@@ -30,12 +30,12 @@ public class ConsistencyService {
         // la fix version deve avere una releaseDate valida
         ProjectVersion fix = versionRelation.getFixVersion();
         if (fix.getReleaseDate() == null) {
-            return "fixVersion senza releaseDate";
+            return FIX_VERSION + " senza releaseDate";
         }
 
         if (versionRelation.getAffectedVersions().stream()
                 .anyMatch(v -> v.getName().equals(fix.getName()))) {
-            return "fixVersion '" + fix.getName() + "' presente anche nelle affectedVersions";
+            return FIX_VERSION + " '" + fix.getName() + "' presente anche nelle affectedVersions";
         }
 
         if (versionRelation.getOpeningVersion() == null) {
@@ -45,7 +45,7 @@ public class ConsistencyService {
         // la releaseDate della fix version deve essere coerente con la creationDate
         // un ticket non può essere stato aperto DOPO la release in cui è stato fixato
         if (fix.getReleaseDate().isBefore(ticket.getCreationDate().toLocalDate())) {
-            return "fixVersion '" + fix.getName() + "' rilasciata prima della creazione del ticket";
+            return FIX_VERSION + " '" + fix.getName() + "' rilasciata prima della creazione del ticket";
         }
 
         // un ticket non può essere stato creato o chiuso prima della data di rilascio della prima versione
@@ -66,7 +66,7 @@ public class ConsistencyService {
         boolean fixInAllowed = allowedVersions.stream()
                 .anyMatch(v -> v.getName().equals(fixName));
         if (!fixInAllowed) {
-            return "fixVersion '" + fixName + "' non è nelle versioni ammesse";
+            return FIX_VERSION + " '" + fixName + "' non è nelle versioni ammesse";
         }
 
         // Il controllo verifica che la injection version sia stata rilasciata prima della fix version E non puo stare dopo la OV

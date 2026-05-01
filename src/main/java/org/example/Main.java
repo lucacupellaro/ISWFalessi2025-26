@@ -18,9 +18,11 @@ import util.ProgressLogger;
 
 import java.io.File;
 import java.util.List;
+import java.util.logging.Logger;
 
 public class Main {
 
+    private static final Logger logger = Logger.getLogger(Main.class.getName());
     private static final String CSV_PATH = "src/main/java/file/TicketRelease.csv";
 
     public static void main(String[] args) throws Exception {
@@ -28,7 +30,7 @@ public class Main {
         int percent = config.getSettings().getMaxVersionsPercent();
 
         if (args.length == 0) {
-            System.out.println("Specificare phase1, phase2 o phase3 come argomento");
+            logger.info("Specificare phase1, phase2 o phase3 come argomento");
             return;
         }
 
@@ -39,20 +41,20 @@ public class Main {
         } else if (args[0].equals("phase3")) {
             runPhase3(args);
         } else {
-            System.out.println("Argomento non riconosciuto: " + args[0]);
+            logger.info("Argomento non riconosciuto: " + args[0]);
         }
     }
 
     private static void runPhase1(AppConfig config, int percent) {
         if (new File(CSV_PATH).exists()) {
-            System.out.println("TicketRelease.csv già presente, skip phase1");
+            logger.info("TicketRelease.csv già presente, skip phase1");
             return;
         }
 
-        System.out.println("Avvio phase1...");
-        System.out.println("Si recuperano tutti i ticket del " + percent
+        logger.info("Avvio phase1...");
+        logger.info("Si recuperano tutti i ticket del " + percent
                 + "% delle release più vecchie");
-        System.out.println("Progetti: " + config.getProjects().stream()
+        logger.info("Progetti: " + config.getProjects().stream()
                 .map(p -> p.getKey())
                 .toList());
 
@@ -66,16 +68,16 @@ public class Main {
         PrintOnCsv csvPrinter = new PrintOnCsv();
         csvPrinter.print(records);
 
-        System.out.println("Ticket validi recuperati: " + records.size());
+        logger.info("Ticket validi recuperati: " + records.size());
     }
 
     private static void runPhase2(AppConfig config) throws Exception {
         if (!new File(CSV_PATH).exists()) {
-            System.out.println("TicketRelease.csv non trovato — eseguire prima phase1");
+            logger.info("TicketRelease.csv non trovato — eseguire prima phase1");
             return;
         }
 
-        System.out.println("Avvio phase2...");
+        logger.info("Avvio phase2...");
 
         ProgressLogger logger = new ProgressLogger();
 
@@ -114,7 +116,7 @@ public class Main {
 
     private static void runPhase3(String[] args) throws Exception {
 
-        System.out.println("Avvio phase3 — MLWeka Pipeline...");
+        logger.info("Avvio phase3 — MLWeka Pipeline...");
         MLWekaController controller = new MLWekaController();
 
        // controller.normalizeDataset()

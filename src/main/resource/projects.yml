@@ -8,10 +8,6 @@ settings:
 
 
 
-
-
-
-
 projects:
   - key: ZOOKEEPER
     repoName: zookeeper

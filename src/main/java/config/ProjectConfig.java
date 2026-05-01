@@ -13,6 +13,7 @@ public class ProjectConfig {
     public String getRepoName() { return repoName; }
     public void setRepoName(String repoName) { this.repoName = repoName; }
 
+    // Costruttore vuoto richiesto da Jackson per la deserializzazione YAML
     public ProjectConfig() {}
 
     public String getKey() { return key; }

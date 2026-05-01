@@ -7,6 +7,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.logging.Logger;
 
 /**
  * Esegue chiamate HTTP verso Jira per recuperare i ticket tramite JQL.
@@ -14,6 +15,7 @@ import java.util.Base64;
  */
 public class JiraHttpClient {
 
+    private static final Logger logger = Logger.getLogger(JiraHttpClient.class.getName());
     private final String baseUrl;
     private final String authHeader;
     private final HttpClient httpClient;
@@ -26,7 +28,7 @@ public class JiraHttpClient {
     }
 
     public String fetchIssues(String jql, int startAt, int maxResults) {
-        System.out.println("[HTTP] Chiamata Jira issues — startAt=" + startAt + " maxResults=" + maxResults);
+        logger.info("[HTTP] Chiamata Jira issues — startAt=" + startAt + " maxResults=" + maxResults);
         String url = baseUrl + "/rest/api/2/search"
                 + "?jql=" + URLEncoder.encode(jql, StandardCharsets.UTF_8)
                 + "&startAt=" + startAt
