@@ -135,6 +135,25 @@ public class MetricsServices {
         }
     }
 
+    public void computeSmellsFromContent(List<JavaClass> classes) {
+        for (JavaClass javaClass : classes) {
+            String content = javaClass.getContent();
+            if (content == null) {
+                setDefaultSmells(javaClass);
+                continue;
+            }
+            try {
+                PmdMetrics metrics = runPmd(content, javaClass.getName());
+                javaClass.setNSmells(metrics.smells());
+                javaClass.setCyclomaticComplexity(metrics.cyclomaticComplexity());
+                javaClass.setDuplication(metrics.duplication());
+            } catch (Exception e) {
+                logger.logWarning("PMD error per classe " + javaClass.getName() + ": " + e.getMessage());
+                setDefaultSmells(javaClass);
+            }
+        }
+    }
+
     private void computeSmells(List<JavaClass> classes, String previousReleaseSha) {
         for (JavaClass javaClass : classes) {
             // Per la prima release o classe non esistente nella release precedente

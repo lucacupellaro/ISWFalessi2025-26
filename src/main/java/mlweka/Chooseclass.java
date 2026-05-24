@@ -145,14 +145,19 @@ public class Chooseclass {
      */
     private static boolean isTooSmallAndSimple(Instance instance, double locQ1) {
         double loc = value(instance, LOC);
-        double cyclomatic = value(instance, CYCLOMATIC_COMPLEXITY);
         double branches = value(instance, N_BRANCHES);
         double nesting = value(instance, MAX_NESTING_DEPTH);
+        double smells = value(instance, NSMELLS);
 
-        return loc <= locQ1
-                || cyclomatic <= 1.0
-                || branches <= 1.0
-                || nesting <= 1.0;
+        boolean tooSmallAbsolute = loc < 150.0;
+
+        boolean noCodeSmells = smells <= 0.0;
+
+        boolean tooSmallAndSimple = loc <= locQ1
+                && branches <= 1.0
+                && nesting <= 1.0;
+
+        return tooSmallAbsolute || noCodeSmells || tooSmallAndSimple;
     }
 
     private static Comparator<Instance> buildRankingComparator(Instances data) {

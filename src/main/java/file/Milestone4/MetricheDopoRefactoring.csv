@@ -1,0 +1,6 @@
+className,loc,commentLines,nRevisions,nAuth,nFix,locAdded,maxLocAdded,avgLocAdded,churn,maxChurn,avgChurn,locTouched,changeSetSize,maxChangeSet,avgChangeSet,age,weightedAge,cyclomaticComplexity,duplication,nBranches,maxNestingDepth,nSmellsPmd,nSmellsSonar
+DataTree_original,1322,477,129,36,19,3866,516,31.69,2794,516,22.90,5748,6119,1187,47.43,961.69,614.76,9,1,256,6,102,33
+DataTreeC1,1289,477,129,36,19,3866,516,31.69,2794,516,22.90,5748,6119,1187,47.43,961.69,614.76,9,1,256,6,104,5
+DataTree_C2,1305,174,129,36,19,3866,516,31.69,2794,516,22.90,5748,6119,1187,47.43,961.69,614.76,7,0,196,6,94,23
+DataTree_C3,1305,174,129,36,19,3866,516,31.69,2794,516,22.90,5748,6119,1187,47.43,961.69,614.76,7,0,196,6,94,23
+DataTree_C4,753,20,129,36,19,3866,516,31.69,2794,516,22.90,5748,6119,1187,47.43,961.69,614.76,6,0,150,4,76,25
