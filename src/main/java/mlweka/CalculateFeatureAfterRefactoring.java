@@ -12,24 +12,54 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 public class CalculateFeatureAfterRefactoring {
 
     private static final String CSV_DIR = "src/main/java/file/Milestone4";
-    private static final String CSV_FILE = CSV_DIR + "/MetricheDopoRefactoringPathTrie.csv";
     private static final String HEADER = "className,loc,commentLines,nRevisions,nAuth,nFix," +
             "locAdded,maxLocAdded,avgLocAdded,churn,maxChurn,avgChurn,locTouched," +
             "changeSetSize,maxChangeSet,avgChangeSet,age,weightedAge," +
             "cyclomaticComplexity,duplication,nBranches,maxNestingDepth,nSmellsPmd,nSmellsSonar";
 
-    private static final String CLASS_REFACTORED = "tmp/PathTrieRefactored/PathTrie_c4.java";
-    private static final String CLASS_ORIGINAL = "tmp/PathTrieRefactored/PathTriee_original.java";
-
     private final MetricsServices metricsServices;
+    private final String csvFile;
+    private final GitMetrics gitMetrics;
 
-    public CalculateFeatureAfterRefactoring() {
+    /**
+     * Metriche git calcolate dalla storia del repo ZooKeeper fino al commit 6c4fabfd.
+     * Identiche per versione originale e refactorizzata (il refactoring non modifica la storia git).
+     */
+    record GitMetrics(int nRevisions, int nAuth, int nFix,
+                      int locAdded, int maxLocAdded, double avgLocAdded,
+                      int churn, int maxChurn, double avgChurn,
+                      int locTouched,
+                      int changeSetSize, int maxChangeSet, double avgChangeSet,
+                      double age, double weightedAge) {}
+
+    private static final Map<String, GitMetrics> METRICS_PER_CLASS = Map.of(
+            "DataTree", new GitMetrics(129, 36, 19,
+                    3866, 516, 31.69,
+                    2794, 516, 22.90,
+                    5748,
+                    6119, 1187, 47.43,
+                    961.69, 614.76),
+            "PathTrie", new GitMetrics(13, 10, 2,
+                    1471, 346, 113.15,
+                    356, 280, 27.38,
+                    2588,
+                    2745, 1187, 211.15,
+                    896.14, 430.27)
+    );
+
+    public CalculateFeatureAfterRefactoring(String csvFile, String classKey) {
         ProgressLogger logger = new ProgressLogger();
         this.metricsServices = new MetricsServices(logger, null);
+        this.csvFile = csvFile;
+        this.gitMetrics = METRICS_PER_CLASS.get(classKey);
+        if (this.gitMetrics == null) {
+            throw new IllegalArgumentException("Nessuna metrica git definita per la classe: " + classKey);
+        }
     }
 
     public void calculateAndAppend(String filePath) throws IOException {
@@ -44,58 +74,48 @@ public class CalculateFeatureAfterRefactoring {
         List<GitCommit> emptyCommits = Collections.emptyList();
         ProjectVersion dummyRelease = new ProjectVersion("after-refactoring", LocalDate.now());
 
-        // Calcola LOC, commentLines, structuralMetrics (nBranches, maxNestingDepth)
         metricsServices.computeAllMetrics(classList, emptyCommits, dummyRelease, null);
-
-        // Calcola smells, cyclomaticComplexity, duplication dal contenuto del file
         metricsServices.computeSmellsFromContent(classList);
-
-        // Imposta le metriche git reali (calcolate dalla storia del repo ZooKeeper)
         setGitMetrics(javaClass);
 
         appendToCsv(javaClass);
     }
 
-    /**
-     * Metriche git calcolate dalla storia completa del repo ZooKeeper
-     * fino al commit 6c4fabfd (prima delle modifiche utente).
-     * Queste metriche sono identiche per la versione originale e refactorizzata
-     * perché il refactoring non modifica la storia git precedente.
-     */
     private void setGitMetrics(JavaClass jc) {
-        jc.setNRevisions(129);
-        jc.setNAuth(36);
-        jc.setNFix(19);
-        jc.sumLocAdded(3866);
-        jc.setMaxLocAdded(516);
-        jc.setAvgLocAdded(31.69);
-        jc.sumChurn(2794);
-        jc.setMaxChurn(516);
-        jc.setAvgChurn(22.90);
-        jc.addLocTouched(5748);
-        jc.setChangeSetSize(6119);
-        jc.setMaxChangeSet(1187);
-        jc.setAvgChangeSet(47.43);
-        jc.setAge(961.69);
-        jc.setWeightedAge(614.76);
+        jc.setNRevisions(gitMetrics.nRevisions());
+        jc.setNAuth(gitMetrics.nAuth());
+        jc.setNFix(gitMetrics.nFix());
+        jc.sumLocAdded(gitMetrics.locAdded());
+        jc.setMaxLocAdded(gitMetrics.maxLocAdded());
+        jc.setAvgLocAdded(gitMetrics.avgLocAdded());
+        jc.sumChurn(gitMetrics.churn());
+        jc.setMaxChurn(gitMetrics.maxChurn());
+        jc.setAvgChurn(gitMetrics.avgChurn());
+        jc.addLocTouched(gitMetrics.locTouched());
+        jc.setChangeSetSize(gitMetrics.changeSetSize());
+        jc.setMaxChangeSet(gitMetrics.maxChangeSet());
+        jc.setAvgChangeSet(gitMetrics.avgChangeSet());
+        jc.setAge(gitMetrics.age());
+        jc.setWeightedAge(gitMetrics.weightedAge());
     }
 
     public static void main(String[] args) {
         try {
-            CalculateFeatureAfterRefactoring calculator = new CalculateFeatureAfterRefactoring();
+            // === DataTree ===
+            runForClass(
+                    CSV_DIR + "/MetricheDopoRefactoring.csv",
+                    "DataTree",
+                    "tmp/DataTreeRefactored/DataTree_original.java",
+                    "tmp/DataTreeRefactored/DataTree_C4.java"
+            );
 
-            // Riga 1: classe originale — aggiunta solo se il CSV non esiste ancora
-            File csvFile = new File(CSV_FILE);
-            if (!csvFile.exists() || csvFile.length() == 0) {
-                calculator.calculateAndAppend(CLASS_ORIGINAL);
-                System.out.println("Metriche originale aggiunte per: " + CLASS_ORIGINAL);
-            } else {
-                System.out.println("CSV già presente, salto classe originale.");
-            }
-
-            // Riga successiva: classe refactorizzata
-            calculator.calculateAndAppend(CLASS_REFACTORED);
-            System.out.println("Metriche refactorizzate aggiunte per: " + CLASS_REFACTORED);
+            // === PathTrie ===
+            runForClass(
+                    CSV_DIR + "/MetricheDopoRefactoringPathTrie.csv",
+                    "PathTrie",
+                    "tmp/PathTrieRefactored/PathTriee_original.java",
+                    "tmp/PathTrieRefactored/PathTrie_c4.java"
+            );
 
         } catch (IOException e) {
             System.err.println("Errore: " + e.getMessage());
@@ -103,8 +123,24 @@ public class CalculateFeatureAfterRefactoring {
         }
     }
 
+    private static void runForClass(String csvPath, String classKey,
+                                    String originalPath, String refactoredPath) throws IOException {
+        CalculateFeatureAfterRefactoring calculator = new CalculateFeatureAfterRefactoring(csvPath, classKey);
+
+        File csvFile = new File(csvPath);
+        if (!csvFile.exists() || csvFile.length() == 0) {
+            calculator.calculateAndAppend(originalPath);
+            System.out.println("Metriche originale aggiunte per: " + originalPath);
+        } else {
+            System.out.println("CSV già presente, salto classe originale per: " + classKey);
+        }
+
+        calculator.calculateAndAppend(refactoredPath);
+        System.out.println("Metriche refactorizzate aggiunte per: " + refactoredPath);
+    }
+
     private void appendToCsv(JavaClass jc) throws IOException {
-        File csvFile = new File(CSV_FILE);
+        File csvFile = new File(this.csvFile);
         boolean writeHeader = !csvFile.exists() || csvFile.length() == 0;
 
         try (PrintWriter pw = new PrintWriter(new FileWriter(csvFile, true))) {
