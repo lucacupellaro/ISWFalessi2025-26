@@ -27,7 +27,7 @@ public class Main {
     private static final Logger logger = Logger.getLogger(Main.class.getName());
     private static final String CSV_PATH = "src/main/java/file/TicketRelease.csv";
 
-    public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws IOException, InterruptedException {
         AppConfig config = AppConfig.load();
         int percent = config.getSettings().getMaxVersionsPercent();
 
@@ -115,7 +115,7 @@ public class Main {
         });
     }
 
-    private static void runPhase3() throws Exception {
+    private static void runPhase3() throws IOException {
         logger.info("Avvio phase3 — MLWeka Pipeline...");
         MLWekaController controller = new MLWekaController();
         controller.normalizeDataset();

@@ -85,8 +85,8 @@ public class GitHubCommitClient {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("Authorization", "Bearer " + token)
-                .header("Accept", "application/vnd.github+json")
+                .header(AUTH_HEADER, BEARER_PREFIX + token)
+                .header(ACCEPT_HEADER, GITHUB_JSON)
                 .GET()
                 .build();
 
@@ -121,8 +121,8 @@ public class GitHubCommitClient {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("Authorization", "Bearer " + token)
-                .header("Accept", "application/vnd.github+json")
+                .header(AUTH_HEADER, BEARER_PREFIX + token)
+                .header(ACCEPT_HEADER, GITHUB_JSON)
                 .GET()
                 .build();
 
@@ -162,8 +162,8 @@ public class GitHubCommitClient {
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("Authorization", "Bearer " + token)
-                .header("Accept", "application/vnd.github+json")
+                .header(AUTH_HEADER, BEARER_PREFIX + token)
+                .header(ACCEPT_HEADER, GITHUB_JSON)
                 .GET()
                 .build();
 

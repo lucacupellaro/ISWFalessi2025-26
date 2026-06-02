@@ -85,9 +85,11 @@ public class Phase2Controller {
         List<ClassRecord> records = buildRecords(allClasses);
         printDatasetCsv.write(records);
 
-        logSummary(projectKey, windowedReleases, windowStart, windowEnd,
+        LogSummaryParams summaryParams = new LogSummaryParams(
+                projectKey, windowedReleases, windowStart, windowEnd,
                 allCommits, commits, allClasses, classiBuggy,
                 ticketsConCommit, ticketsConIV, records);
+        logSummary(summaryParams);
     }
 
     private List<GitCommit> loadAndFilterCommits(String repoName,
@@ -309,38 +311,66 @@ public class Phase2Controller {
                 .toList();
     }
 
-    private void logSummary(String projectKey,
-                            List<ProjectVersion> windowedReleases,
-                            LocalDate windowStart, LocalDate windowEnd,
-                            List<GitCommit> allCommits, List<GitCommit> commits,
-                            List<JavaClass> allClasses, long classiBuggy,
-                            int ticketsConCommit, long ticketsConIV,
-                            List<ClassRecord> records) {
+    private static class LogSummaryParams {
+        private final String projectKey;
+        private final List<ProjectVersion> windowedReleases;
+        private final LocalDate windowStart;
+        private final LocalDate windowEnd;
+        private final List<GitCommit> allCommits;
+        private final List<GitCommit> commits;
+        private final List<JavaClass> allClasses;
+        private final long classiBuggy;
+        private final int ticketsConCommit;
+        private final long ticketsConIV;
+        private final List<ClassRecord> records;
 
-        long commitsFuoriFinestra = allCommits.size() - commits.size();
-        long commitsConRelease = commits.stream().filter(c -> c.getRelease() != null).count();
-        long commitsSenzaRelease = commits.stream().filter(c -> c.getRelease() == null).count();
-        long classiUniche = allClasses.stream()
+        private LogSummaryParams(String projectKey,
+                                 List<ProjectVersion> windowedReleases,
+                                 LocalDate windowStart, LocalDate windowEnd,
+                                 List<GitCommit> allCommits, List<GitCommit> commits,
+                                 List<JavaClass> allClasses, long classiBuggy,
+                                 int ticketsConCommit, long ticketsConIV,
+                                 List<ClassRecord> records) {
+            this.projectKey = projectKey;
+            this.windowedReleases = windowedReleases;
+            this.windowStart = windowStart;
+            this.windowEnd = windowEnd;
+            this.allCommits = allCommits;
+            this.commits = commits;
+            this.allClasses = allClasses;
+            this.classiBuggy = classiBuggy;
+            this.ticketsConCommit = ticketsConCommit;
+            this.ticketsConIV = ticketsConIV;
+            this.records = records;
+        }
+    }
+
+    private void logSummary(LogSummaryParams params) {
+
+        long commitsFuoriFinestra = params.allCommits.size() - params.commits.size();
+        long commitsConRelease = params.commits.stream().filter(c -> c.getRelease() != null).count();
+        long commitsSenzaRelease = params.commits.stream().filter(c -> c.getRelease() == null).count();
+        long classiUniche = params.allClasses.stream()
                 .map(JavaClass::getName)
                 .distinct()
                 .count();
 
         logger.logInfo("[CONSISTENCY] ============ RIEPILOGO FASE 2 ============");
-        logger.logInfo("[CONSISTENCY] Progetto              : " + projectKey);
-        logger.logInfo("[CONSISTENCY] Release analizzate    : " + windowedReleases.size());
-        logger.logInfo("[CONSISTENCY] Finestra temporale    : [" + windowStart + " -> " + windowEnd + "]");
-        logger.logInfo("[CONSISTENCY] Commit totali scaricati: " + allCommits.size());
-        logger.logInfo("[CONSISTENCY] Commit nella finestra : " + commits.size());
+        logger.logInfo("[CONSISTENCY] Progetto              : " + params.projectKey);
+        logger.logInfo("[CONSISTENCY] Release analizzate    : " + params.windowedReleases.size());
+        logger.logInfo("[CONSISTENCY] Finestra temporale    : [" + params.windowStart + " -> " + params.windowEnd + "]");
+        logger.logInfo("[CONSISTENCY] Commit totali scaricati: " + params.allCommits.size());
+        logger.logInfo("[CONSISTENCY] Commit nella finestra : " + params.commits.size());
         logger.logInfo("[CONSISTENCY] Commit fuori finestra : " + commitsFuoriFinestra);
         logger.logInfo("[CONSISTENCY] Commit assegnati      : " + commitsConRelease);
         logger.logInfo("[CONSISTENCY] Commit non assegnati  : " + commitsSenzaRelease);
-        logger.logInfo("[CONSISTENCY] Classi totali         : " + allClasses.size()
+        logger.logInfo("[CONSISTENCY] Classi totali         : " + params.allClasses.size()
                 + " (nomi distinti: " + classiUniche + ")");
-        logger.logInfo("[CONSISTENCY] Classi buggy          : " + classiBuggy
-                + " (" + String.format("%.1f", 100.0 * classiBuggy / allClasses.size()) + "%)");
-        logger.logInfo("[CONSISTENCY] Ticket usati          : " + ticketsConCommit
-                + "/" + ticketsConIV + " con IV");
-        logger.logInfo("[CONSISTENCY] Record CSV scritti    : " + records.size());
+        logger.logInfo("[CONSISTENCY] Classi buggy          : " + params.classiBuggy
+                + " (" + String.format("%.1f", 100.0 * params.classiBuggy / params.allClasses.size()) + "%)");
+        logger.logInfo("[CONSISTENCY] Ticket usati          : " + params.ticketsConCommit
+                + "/" + params.ticketsConIV + " con IV");
+        logger.logInfo("[CONSISTENCY] Record CSV scritti    : " + params.records.size());
         logger.logInfo("[CONSISTENCY] ==========================================");
     }
 

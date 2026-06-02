@@ -390,12 +390,13 @@ public class MetricsServices {
     private int computeMaxNestingDepth(String content) {
         NestingState state = new NestingState();
 
-        for (int i = 0; i < content.length(); i++) {
+        int i = 0;
+        while (i < content.length()) {
             char c = content.charAt(i);
             char next = (i + 1 < content.length()) ? content.charAt(i + 1) : 0;
 
             int charsToSkip = state.processChar(c, next);
-            i += charsToSkip;
+            i += 1 + charsToSkip;
         }
         return state.getMaxDepth();
     }

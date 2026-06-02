@@ -13,8 +13,12 @@ import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class CalculateFeatureAfterRefactoring {
+
+    private static final Logger logger = Logger.getLogger(CalculateFeatureAfterRefactoring.class.getName());
 
     private static final String CSV_DIR = "src/main/java/file/Milestone4";
     private static final String HEADER = "className,loc,commentLines,nRevisions,nAuth,nFix," +
@@ -118,7 +122,7 @@ public class CalculateFeatureAfterRefactoring {
             );
 
         } catch (IOException e) {
-            System.err.println("Errore: " + e.getMessage());
+            logger.log(Level.SEVERE, "Errore: {0}", e.getMessage());
             System.exit(1);
         }
     }
@@ -127,23 +131,23 @@ public class CalculateFeatureAfterRefactoring {
                                     String originalPath, String refactoredPath) throws IOException {
         CalculateFeatureAfterRefactoring calculator = new CalculateFeatureAfterRefactoring(csvPath, classKey);
 
-        File csvFile = new File(csvPath);
-        if (!csvFile.exists() || csvFile.length() == 0) {
+        File outputCsvFile = new File(csvPath);
+        if (!outputCsvFile.exists() || outputCsvFile.length() == 0) {
             calculator.calculateAndAppend(originalPath);
-            System.out.println("Metriche originale aggiunte per: " + originalPath);
+            logger.log(Level.INFO, "Metriche originale aggiunte per: {0}", originalPath);
         } else {
-            System.out.println("CSV già presente, salto classe originale per: " + classKey);
+            logger.log(Level.INFO, "CSV già presente, salto classe originale per: {0}", classKey);
         }
 
         calculator.calculateAndAppend(refactoredPath);
-        System.out.println("Metriche refactorizzate aggiunte per: " + refactoredPath);
+        logger.log(Level.INFO, "Metriche refactorizzate aggiunte per: {0}", refactoredPath);
     }
 
     private void appendToCsv(JavaClass jc) throws IOException {
-        File csvFile = new File(this.csvFile);
-        boolean writeHeader = !csvFile.exists() || csvFile.length() == 0;
+        File localCsvFile = new File(this.csvFile);
+        boolean writeHeader = !localCsvFile.exists() || localCsvFile.length() == 0;
 
-        try (PrintWriter pw = new PrintWriter(new FileWriter(csvFile, true))) {
+        try (PrintWriter pw = new PrintWriter(new FileWriter(localCsvFile, true))) {
             if (writeHeader) {
                 pw.println(HEADER);
             }

@@ -14,7 +14,9 @@ public class ProjectConfig {
     public void setRepoName(String repoName) { this.repoName = repoName; }
 
     // Costruttore vuoto richiesto da Jackson per la deserializzazione YAML
-    public ProjectConfig() {}
+    public ProjectConfig() {
+        // Empty constructor required by Jackson for YAML deserialization
+    }
 
     public String getKey() { return key; }
     public void setKey(String key) { this.key = key; }

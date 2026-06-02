@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
+import java.util.logging.Logger;
 
 /**
  * Genera la tabella:
@@ -24,6 +25,8 @@ import java.util.*;
  */
 public class CorrelationFeatures {
 
+    private static final Logger LOGGER = Logger.getLogger(CorrelationFeatures.class.getName());
+
     private static final String DATASET_A_PATH =
             "src/main/java/file/MIlestone3/A_original_complete_NN.csv";
 
@@ -31,7 +34,7 @@ public class CorrelationFeatures {
             "src/main/java/file/MIlestone3/B_counterfactual_no_smells_NN.csv";
 
     private static final String DATASET_C_PATH =
-            "/home/lucacupellaro/luca/Universita/ISW2/2025_2026/falessi/ProgettoEsame/src/main/java/file/MIlestone3/C_original_no_smells_NN.csv";
+            "src/main/java/file/MIlestone3/C_original_no_smells_NN.csv";
 
     private static final String OUTPUT_PATH =
             "src/main/java/file/MIlestone3/correlazioni.csv";
@@ -58,8 +61,8 @@ public class CorrelationFeatures {
         saveTableToCsv(rows, OUTPUT_PATH);
         printTable(rows);
 
-        System.out.println();
-        System.out.println("File creato: " + new File(OUTPUT_PATH).getAbsolutePath());
+        LOGGER.info("");
+        LOGGER.info("File creato: " + new File(OUTPUT_PATH).getAbsolutePath());
     }
 
     private static void validateDataset(Instances data, String datasetName) {
@@ -86,70 +89,74 @@ public class CorrelationFeatures {
     ) {
         List<TableRow> rows = new ArrayList<>();
 
-        Attribute nSmellsAttribute = datasetA.attribute(NSMELLS_ATTRIBUTE);
-
         for (int i = 0; i < datasetA.numAttributes(); i++) {
             Attribute attributeA = datasetA.attribute(i);
 
-            if (i == datasetA.classIndex()) {
-                continue;
-            }
-
-            if (!attributeA.isNumeric()) {
-                continue;
-            }
-
-            String featureName = attributeA.name();
-
-            Attribute attributeB = datasetB.attribute(featureName);
-            Attribute attributeC = datasetC.attribute(featureName);
-
-            if (attributeB == null || attributeC == null) {
-                System.out.println("Feature saltata perché non presente in tutti i dataset: " + featureName);
-                continue;
-            }
-
-            if (!attributeB.isNumeric() || !attributeC.isNumeric()) {
-                System.out.println("Feature saltata perché non numerica in tutti i dataset: " + featureName);
-                continue;
-            }
-
-            double meanA = mean(datasetA, featureName);
-            double meanB = mean(datasetB, featureName);
-            double meanC = mean(datasetC, featureName);
-
-            String correlationWithNSmells;
-
-            if (featureName.equals(NSMELLS_ATTRIBUTE)) {
-                correlationWithNSmells = "-";
+            if (i == datasetA.classIndex() || !attributeA.isNumeric()) {
+                // skip class attribute and non-numeric attributes
             } else {
-                CorrelationResult resultNSmells = spearmanCorrelation(
-                        datasetA,
-                        featureName,
-                        NSMELLS_ATTRIBUTE
-                );
-
-                correlationWithNSmells = formatCorrelation(resultNSmells);
+                TableRow row = buildRowForAttribute(attributeA, datasetA, datasetB, datasetC);
+                if (row != null) {
+                    rows.add(row);
+                }
             }
-
-            CorrelationResult resultDefectiveness = spearmanCorrelationWithDefectiveness(
-                    datasetA,
-                    featureName
-            );
-
-            String correlationWithDefectiveness = formatCorrelation(resultDefectiveness);
-
-            rows.add(new TableRow(
-                    featureName,
-                    formatMean(meanA),
-                    formatMean(meanB),
-                    formatMean(meanC),
-                    correlationWithNSmells,
-                    correlationWithDefectiveness
-            ));
         }
 
         return rows;
+    }
+
+    private static TableRow buildRowForAttribute(Attribute attributeA,
+                                                     Instances datasetA,
+                                                     Instances datasetB,
+                                                     Instances datasetC) {
+        String featureName = attributeA.name();
+
+        Attribute attributeB = datasetB.attribute(featureName);
+        Attribute attributeC = datasetC.attribute(featureName);
+
+        if (attributeB == null || attributeC == null) {
+            LOGGER.info("Feature saltata perché non presente in tutti i dataset: " + featureName);
+            return null;
+        }
+
+        if (!attributeB.isNumeric() || !attributeC.isNumeric()) {
+            LOGGER.info("Feature saltata perché non numerica in tutti i dataset: " + featureName);
+            return null;
+        }
+
+        double meanA = mean(datasetA, featureName);
+        double meanB = mean(datasetB, featureName);
+        double meanC = mean(datasetC, featureName);
+
+        String correlationWithNSmells;
+
+        if (featureName.equals(NSMELLS_ATTRIBUTE)) {
+            correlationWithNSmells = "-";
+        } else {
+            CorrelationResult resultNSmells = spearmanCorrelation(
+                    datasetA,
+                    featureName,
+                    NSMELLS_ATTRIBUTE
+            );
+
+            correlationWithNSmells = formatCorrelation(resultNSmells);
+        }
+
+        CorrelationResult resultDefectiveness = spearmanCorrelationWithDefectiveness(
+                datasetA,
+                featureName
+        );
+
+        String correlationWithDefectiveness = formatCorrelation(resultDefectiveness);
+
+        return new TableRow(
+                featureName,
+                formatMean(meanA),
+                formatMean(meanB),
+                formatMean(meanC),
+                correlationWithNSmells,
+                correlationWithDefectiveness
+        );
     }
 
     private static double mean(Instances data, String attributeName) {
@@ -231,30 +238,34 @@ public class CorrelationFeatures {
         List<Double> y = new ArrayList<>();
 
         for (int i = 0; i < data.numInstances(); i++) {
-            Instance instance = data.instance(i);
-
-            if (instance.isMissing(feature) || instance.isMissing(buggy)) {
-                continue;
-            }
-
-            Double buggyBinary = buggyToBinary(instance, buggy);
-
-            if (buggyBinary == null) {
-                continue;
-            }
-
-            x.add(instance.value(feature));
-            y.add(buggyBinary);
+            addDefectivenessDataPoint(data.instance(i), feature, buggy, x, y);
         }
 
         return computeSpearman(x, y);
+    }
+
+    private static void addDefectivenessDataPoint(Instance instance,
+                                                      Attribute feature,
+                                                      Attribute buggy,
+                                                      List<Double> x,
+                                                      List<Double> y) {
+        if (instance.isMissing(feature) || instance.isMissing(buggy)) {
+            return;
+        }
+
+        Double buggyBinary = buggyToBinary(instance, buggy);
+
+        if (buggyBinary != null) {
+            x.add(instance.value(feature));
+            y.add(buggyBinary);
+        }
     }
 
     private static Double buggyToBinary(Instance instance, Attribute buggyAttribute) {
         if (buggyAttribute.isNominal() || buggyAttribute.isString()) {
             String value = instance.stringValue(buggyAttribute).trim().toLowerCase(Locale.ROOT);
 
-            if (value.equals("yes") || value.equals("true") || value.equals("1") || value.equals("buggy")) {
+            if (value.equals("yes") || value.equals("true") || value.equals("1") || value.equals(BUGGY_ATTRIBUTE)) {
                 return 1.0;
             }
 
@@ -452,7 +463,10 @@ public class CorrelationFeatures {
         if (x < (a + 1.0) / (a + b + 2.0)) {
             return bt * betaContinuedFraction(x, a, b) / a;
         } else {
-            return 1.0 - bt * betaContinuedFraction(1.0 - x, b, a) / b;
+            // Identity: I_x(a,b) = 1 - I_{1-x}(b,a) — swap a and b intentionally
+            double swappedA = b;
+            double swappedB = a;
+            return 1.0 - bt * betaContinuedFraction(1.0 - x, swappedA, swappedB) / b;
         }
     }
 
@@ -606,28 +620,28 @@ public class CorrelationFeatures {
     }
 
     private static void printTable(List<TableRow> rows) {
-        System.out.printf(
-                "%-25s %12s %12s %12s %25s %32s%n",
+        LOGGER.info(String.format(
+                "%-25s %12s %12s %12s %25s %32s",
                 "Variable",
                 "Mean A",
                 "Mean B",
                 "Mean C",
                 "Corr NSmells",
                 "Corr Defectiveness"
-        );
+        ));
 
-        System.out.println("-".repeat(125));
+        LOGGER.info("-".repeat(125));
 
         for (TableRow row : rows) {
-            System.out.printf(
-                    "%-25s %12s %12s %12s %25s %32s%n",
+            LOGGER.info(String.format(
+                    "%-25s %12s %12s %12s %25s %32s",
                     row.variable,
                     row.meanA,
                     row.meanB,
                     row.meanC,
                     row.correlationWithNSmells,
                     row.correlationWithDefectiveness
-            );
+            ));
         }
     }
 

@@ -11,6 +11,8 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Seleziona le classi candidate per la Milestone 4.
@@ -26,11 +28,13 @@ import java.util.*;
  */
 public class Chooseclass {
 
+    private static final Logger logger = Logger.getLogger(Chooseclass.class.getName());
+
     private static final String INPUT_PATH =
-            "/home/lucacupellaro/luca/Universita/ISW2/2025_2026/falessi/ProgettoEsame/src/main/java/file/DatasetClassiRelease.csv";
+            "src/main/java/file/DatasetClassiRelease.csv";
 
     private static final String OUTPUT_PATH =
-            "/home/lucacupellaro/luca/Universita/ISW2/2025_2026/falessi/ProgettoEsame/src/main/java/file/Milestone4/ClassiSelezionate.csv";
+            "src/main/java/file/Milestone4/ClassiSelezionate.csv";
 
     private static final String RELEASE = "release";
     private static final String LOC = "loc";
@@ -48,12 +52,12 @@ public class Chooseclass {
         validateRequiredAttributes(data);
 
         String lastRelease = findLastRelease(data);
-        System.out.println("Ultima release individuata: " + lastRelease);
+        logger.log(Level.INFO, "Ultima release individuata: {0}", lastRelease);
 
         List<Instance> lastReleaseInstances = filterByRelease(data, lastRelease);
 
         double locQ1 = computeFirstQuartile(lastReleaseInstances, data.attribute(LOC));
-        System.out.println("Soglia LOC Q1 per filtro classi piccole: " + locQ1);
+        logger.log(Level.INFO, "Soglia LOC Q1 per filtro classi piccole: {0}", locQ1);
 
         List<Instance> selectedClasses = new ArrayList<>();
 
@@ -67,9 +71,9 @@ public class Chooseclass {
 
         saveSelectedClasses(data, selectedClasses, OUTPUT_PATH);
 
-        System.out.println("Classi ultima release: " + lastReleaseInstances.size());
-        System.out.println("Classi selezionate dopo filtro: " + selectedClasses.size());
-        System.out.println("File creato: " + OUTPUT_PATH);
+        logger.log(Level.INFO, "Classi ultima release: {0}", lastReleaseInstances.size());
+        logger.log(Level.INFO, "Classi selezionate dopo filtro: {0}", selectedClasses.size());
+        logger.log(Level.INFO, "File creato: {0}", OUTPUT_PATH);
     }
 
     private static void validateRequiredAttributes(Instances data) {
@@ -301,7 +305,7 @@ public class Chooseclass {
     private static List<Integer> extractVersionNumbers(String version) {
         List<Integer> numbers = new ArrayList<>();
 
-        String[] parts = version.split("[^0-9]+");
+        String[] parts = version.split("\\D+");
 
         for (String part : parts) {
             if (!part.isBlank()) {

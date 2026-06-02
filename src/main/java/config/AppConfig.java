@@ -17,7 +17,9 @@ public class AppConfig {
     private List<ProjectConfig> projects;
 
     // Costruttore vuoto richiesto da Jackson per la deserializzazione YAML
-    public AppConfig() {}
+    public AppConfig() {
+        // Empty constructor required by Jackson for YAML deserialization
+    }
 
     public String getGithubToken() { return settings.getGithubToken(); }
 
@@ -68,7 +70,9 @@ public class AppConfig {
         private String githubToken;
 
         // Costruttore vuoto richiesto da Jackson per la deserializzazione YAML
-        public Settings() {}
+        public Settings() {
+            // Empty constructor required by Jackson for YAML deserialization
+        }
 
         public int getMaxTicketsPerProject() { return maxTicketsPerProject; }
         public void setMaxTicketsPerProject(int v) { this.maxTicketsPerProject = v; }

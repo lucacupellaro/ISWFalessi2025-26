@@ -110,26 +110,18 @@ public class LocalGitService {
 
         for (int i = 1; i < lines.length; i++) {
             String line = lines[i].trim();
-            if (line.isEmpty()) {
-                continue;
-            }
-
             String[] statParts = line.split("\t");
-            if (statParts.length < 3) {
-                continue;
+
+            if (!line.isEmpty() && statParts.length >= 3
+                    && statParts[2].endsWith(".java") && !statParts[2].contains("/test/")) {
+                String path = statParts[2];
+                // "-" indica file binari, li trattiamo come 0
+                int added = statParts[0].equals("-") ? 0 : Integer.parseInt(statParts[0]);
+                int removed = statParts[1].equals("-") ? 0 : Integer.parseInt(statParts[1]);
+
+                touchedPaths.add(path);
+                fileDiffs.put(path, List.of(added, removed));
             }
-
-            String path = statParts[2];
-            if (!path.endsWith(".java") || path.contains("/test/")) {
-                continue;
-            }
-
-            // "-" indica file binari, li trattiamo come 0
-            int added = statParts[0].equals("-") ? 0 : Integer.parseInt(statParts[0]);
-            int removed = statParts[1].equals("-") ? 0 : Integer.parseInt(statParts[1]);
-
-            touchedPaths.add(path);
-            fileDiffs.put(path, List.of(added, removed));
         }
 
         commit.setTouchedPaths(touchedPaths);
