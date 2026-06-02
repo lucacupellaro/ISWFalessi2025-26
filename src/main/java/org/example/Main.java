@@ -108,6 +108,10 @@ public class Main {
         config.getProjects().forEach(project -> {
             try {
                 controller.run(project, tickets, windowPercent);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.logWarning("Errore phase2 per progetto "
+                        + project.getKey() + ": " + e.getMessage());
             } catch (Exception e) {
                 logger.logWarning("Errore phase2 per progetto "
                         + project.getKey() + ": " + e.getMessage());

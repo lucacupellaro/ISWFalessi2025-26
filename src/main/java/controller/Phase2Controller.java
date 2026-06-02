@@ -117,7 +117,7 @@ public class Phase2Controller {
                 .filter(c -> !c.getDate().isAfter(windowEnd))
                 .toList();
 
-        long commitsFuoriFinestra = allCommits.size() - commits.size();
+        long commitsFuoriFinestra = (long) allCommits.size() - commits.size();
 
         logger.logInfo("[CONSISTENCY] Commit nella finestra: " + commits.size() + "/" + allCommits.size());
         logger.logInfo("[CONSISTENCY] Commit fuori finestra: " + commitsFuoriFinestra);
@@ -347,7 +347,7 @@ public class Phase2Controller {
 
     private void logSummary(LogSummaryParams params) {
 
-        long commitsFuoriFinestra = params.allCommits.size() - params.commits.size();
+        long commitsFuoriFinestra = (long) params.allCommits.size() - params.commits.size();
         long commitsConRelease = params.commits.stream().filter(c -> c.getRelease() != null).count();
         long commitsSenzaRelease = params.commits.stream().filter(c -> c.getRelease() == null).count();
         long classiUniche = params.allClasses.stream()

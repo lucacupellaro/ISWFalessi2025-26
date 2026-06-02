@@ -148,6 +148,10 @@ public class LocalGitService {
         try {
             return runGit("git", GIT_DIR_FLAG, repoDir.toString(),
                     "show", sha + ":" + path);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.logWarning("Errore lettura locale " + path + " @ " + sha + ": " + e.getMessage());
+            return null;
         } catch (Exception e) {
             logger.logWarning("Errore lettura locale " + path + " @ " + sha + ": " + e.getMessage());
             return null;

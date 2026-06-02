@@ -51,6 +51,9 @@ public class JiraHttpClient {
             HttpResponse<String> response =
                     httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             return response.body();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Errore chiamata Jira issues: " + e.getMessage(), e);
         } catch (Exception e) {
             throw new IllegalStateException("Errore chiamata Jira issues: " + e.getMessage(), e);
         }
