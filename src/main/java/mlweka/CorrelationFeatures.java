@@ -115,12 +115,12 @@ public class CorrelationFeatures {
         Attribute attributeC = datasetC.attribute(featureName);
 
         if (attributeB == null || attributeC == null) {
-            LOGGER.info("Feature saltata perché non presente in tutti i dataset: " + featureName);
+            LOGGER.info(String.format("Feature saltata perché non presente in tutti i dataset: %s", featureName));
             return null;
         }
 
         if (!attributeB.isNumeric() || !attributeC.isNumeric()) {
-            LOGGER.info("Feature saltata perché non numerica in tutti i dataset: " + featureName);
+            LOGGER.info(String.format("Feature saltata perché non numerica in tutti i dataset: %s", featureName));
             return null;
         }
 
@@ -620,6 +620,9 @@ public class CorrelationFeatures {
     }
 
     private static void printTable(List<TableRow> rows) {
+        if (!LOGGER.isLoggable(java.util.logging.Level.INFO)) {
+            return;
+        }
         LOGGER.info(String.format(
                 "%-25s %12s %12s %12s %25s %32s",
                 "Variable",

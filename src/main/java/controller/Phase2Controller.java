@@ -85,10 +85,18 @@ public class Phase2Controller {
         List<ClassRecord> records = buildRecords(allClasses);
         printDatasetCsv.write(records);
 
-        LogSummaryParams summaryParams = new LogSummaryParams(
-                projectKey, windowedReleases, windowStart, windowEnd,
-                allCommits, commits, allClasses, classiBuggy,
-                ticketsConCommit, ticketsConIV, records);
+        LogSummaryParams summaryParams = new LogSummaryParams()
+                .setProjectKey(projectKey)
+                .setWindowedReleases(windowedReleases)
+                .setWindowStart(windowStart)
+                .setWindowEnd(windowEnd)
+                .setAllCommits(allCommits)
+                .setCommits(commits)
+                .setAllClasses(allClasses)
+                .setClassiBuggy(classiBuggy)
+                .setTicketsConCommit(ticketsConCommit)
+                .setTicketsConIV(ticketsConIV)
+                .setRecords(records);
         logSummary(summaryParams);
     }
 
@@ -312,37 +320,29 @@ public class Phase2Controller {
     }
 
     private static class LogSummaryParams {
-        private final String projectKey;
-        private final List<ProjectVersion> windowedReleases;
-        private final LocalDate windowStart;
-        private final LocalDate windowEnd;
-        private final List<GitCommit> allCommits;
-        private final List<GitCommit> commits;
-        private final List<JavaClass> allClasses;
-        private final long classiBuggy;
-        private final int ticketsConCommit;
-        private final long ticketsConIV;
-        private final List<ClassRecord> records;
+        private String projectKey;
+        private List<ProjectVersion> windowedReleases;
+        private LocalDate windowStart;
+        private LocalDate windowEnd;
+        private List<GitCommit> allCommits;
+        private List<GitCommit> commits;
+        private List<JavaClass> allClasses;
+        private long classiBuggy;
+        private int ticketsConCommit;
+        private long ticketsConIV;
+        private List<ClassRecord> records;
 
-        private LogSummaryParams(String projectKey,
-                                 List<ProjectVersion> windowedReleases,
-                                 LocalDate windowStart, LocalDate windowEnd,
-                                 List<GitCommit> allCommits, List<GitCommit> commits,
-                                 List<JavaClass> allClasses, long classiBuggy,
-                                 int ticketsConCommit, long ticketsConIV,
-                                 List<ClassRecord> records) {
-            this.projectKey = projectKey;
-            this.windowedReleases = windowedReleases;
-            this.windowStart = windowStart;
-            this.windowEnd = windowEnd;
-            this.allCommits = allCommits;
-            this.commits = commits;
-            this.allClasses = allClasses;
-            this.classiBuggy = classiBuggy;
-            this.ticketsConCommit = ticketsConCommit;
-            this.ticketsConIV = ticketsConIV;
-            this.records = records;
-        }
+        private LogSummaryParams setProjectKey(String projectKey) { this.projectKey = projectKey; return this; }
+        private LogSummaryParams setWindowedReleases(List<ProjectVersion> windowedReleases) { this.windowedReleases = windowedReleases; return this; }
+        private LogSummaryParams setWindowStart(LocalDate windowStart) { this.windowStart = windowStart; return this; }
+        private LogSummaryParams setWindowEnd(LocalDate windowEnd) { this.windowEnd = windowEnd; return this; }
+        private LogSummaryParams setAllCommits(List<GitCommit> allCommits) { this.allCommits = allCommits; return this; }
+        private LogSummaryParams setCommits(List<GitCommit> commits) { this.commits = commits; return this; }
+        private LogSummaryParams setAllClasses(List<JavaClass> allClasses) { this.allClasses = allClasses; return this; }
+        private LogSummaryParams setClassiBuggy(long classiBuggy) { this.classiBuggy = classiBuggy; return this; }
+        private LogSummaryParams setTicketsConCommit(int ticketsConCommit) { this.ticketsConCommit = ticketsConCommit; return this; }
+        private LogSummaryParams setTicketsConIV(long ticketsConIV) { this.ticketsConIV = ticketsConIV; return this; }
+        private LogSummaryParams setRecords(List<ClassRecord> records) { this.records = records; return this; }
     }
 
     private void logSummary(LogSummaryParams params) {

@@ -57,8 +57,8 @@ public class CalculateFeatureAfterRefactoring {
     );
 
     public CalculateFeatureAfterRefactoring(String csvFile, String classKey) {
-        ProgressLogger logger = new ProgressLogger();
-        this.metricsServices = new MetricsServices(logger, null);
+        ProgressLogger progressLogger = new ProgressLogger();
+        this.metricsServices = new MetricsServices(progressLogger, null);
         this.csvFile = csvFile;
         this.gitMetrics = METRICS_PER_CLASS.get(classKey);
         if (this.gitMetrics == null) {
