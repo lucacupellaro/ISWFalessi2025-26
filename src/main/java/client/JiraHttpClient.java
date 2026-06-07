@@ -29,7 +29,7 @@ public class JiraHttpClient {
     }
 
     public String fetchIssues(String jql, int startAt, int maxResults) {
-        logger.log(Level.INFO, "[HTTP] Chiamata Jira issues — startAt={0} maxResults={1}",
+        logger.log(Level.FINE, "[HTTP] Chiamata Jira issues — startAt={0} maxResults={1}",
                 new Object[]{startAt, maxResults});
         String url = baseUrl + "/rest/api/2/search"
                 + "?jql=" + URLEncoder.encode(jql, StandardCharsets.UTF_8)

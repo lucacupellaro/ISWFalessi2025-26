@@ -4,6 +4,8 @@ import domain.BugTicketRecord;
 import domain.ProjectVersion;
 
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Calcola il valore di P (Proportion) dalla storia dei ticket che hanno
@@ -16,9 +18,12 @@ import java.util.List;
  */
 public class ProportionCalculator {
 
+    private static final Logger logger = Logger.getLogger(ProportionCalculator.class.getName());
+
     /**
      * Calcola P come media dei valori individuali di tutti i ticket
      * che hanno almeno una affected version (IV nota).
+     * Stampa il valore incrementale di P ad ogni ticket valido.
      *
      * @param ticketRecords  lista completa di BugTicketRecord
      * @param versions lista ordinata delle versioni ammesse (indice = posizione cronologica)
@@ -42,6 +47,9 @@ public class ProportionCalculator {
             if (p != null) {
                 sum += p;
                 count++;
+                double currentP = sum / count;
+                logger.log(Level.INFO, "[PROPORTION] Ticket {0}/{1} — P = {2}",
+                        new Object[]{count, withIv.size(), String.format("%.4f", currentP)});
             }
         }
 

@@ -53,11 +53,8 @@ public class Main {
             return;
         }
 
-        logger.info("Avvio phase1...");
-        logger.log(Level.INFO, "Si recuperano tutti i ticket del {0}% delle release più vecchie", percent);
-        logger.log(Level.INFO, "Progetti: {0}", config.getProjects().stream()
-                .map(p -> p.getKey())
-                .toList());
+        logger.log(Level.FINE, "Avvio phase1 — {0}% release, progetti: {1}",
+                new Object[]{percent, config.getProjects().stream().map(p -> p.getKey()).toList()});
 
         String baseUrl = "https://issues.apache.org/jira";
         String username = "";
