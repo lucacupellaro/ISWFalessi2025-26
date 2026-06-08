@@ -18,6 +18,7 @@ import util.ProgressLogger;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.List;
 import java.util.logging.*;
 
@@ -127,10 +128,11 @@ public class Main {
         for (Handler h : rootLogger.getHandlers()) {
             rootLogger.removeHandler(h);
         }
-        StreamHandler stdoutHandler = new StreamHandler(System.out, new SimpleFormatter()) {
+        OutputStream stdout = System.out;
+        StreamHandler stdoutHandler = new StreamHandler(stdout, new SimpleFormatter()) {
             @Override
-            public synchronized void publish(LogRecord record) {
-                super.publish(record);
+            public synchronized void publish(LogRecord logRecord) {
+                super.publish(logRecord);
                 flush();
             }
         };

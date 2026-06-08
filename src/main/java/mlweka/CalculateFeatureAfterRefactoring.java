@@ -10,6 +10,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -76,7 +77,7 @@ public class CalculateFeatureAfterRefactoring {
 
         List<JavaClass> classList = List.of(javaClass);
         List<GitCommit> emptyCommits = Collections.emptyList();
-        ProjectVersion dummyRelease = new ProjectVersion("after-refactoring", LocalDate.now());
+        ProjectVersion dummyRelease = new ProjectVersion("after-refactoring", LocalDate.now(ZoneId.systemDefault()));
 
         metricsServices.computeAllMetrics(classList, emptyCommits, dummyRelease, null);
         metricsServices.computeSmellsFromContent(classList);
