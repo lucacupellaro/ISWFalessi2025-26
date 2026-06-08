@@ -2,7 +2,7 @@ settings:
   maxTicketsPerProject: 0
   maxTicketsPercent: 100
   maxVersionsPerProject: 0
-  maxVersionsPercent: 33
+  maxVersionsPercent: 100
   pageSize: 1000
 
 

@@ -47,7 +47,7 @@ public class Phase2Controller {
         String projectKey = projectConfig.getKey();
         String repoName = projectConfig.getRepoName();
 
-        logger.logInfo("Scarico release reali da Jira per " + projectKey + " e applico il taglio al " + windowPercent + "%");
+        logger.logFine("Scarico release reali da Jira per " + projectKey + " e applico il taglio al " + windowPercent + "%");
         List<ProjectVersion> windowedReleases = versionService.loadVersions(projectKey, windowPercent);
 
         if (windowedReleases == null || windowedReleases.isEmpty()) {
@@ -55,12 +55,12 @@ public class Phase2Controller {
             return;
         }
 
-        logger.logInfo("Release nella finestra: " + windowedReleases.size());
+        logger.logFine("Release nella finestra: " + windowedReleases.size());
 
         LocalDate windowStart = windowedReleases.get(0).getReleaseDate();
         LocalDate windowEnd = windowedReleases.get(windowedReleases.size() - 1).getReleaseDate();
 
-        logger.logInfo("Finestra temporale considerata: [" + windowStart + " -> " + windowEnd + "]");
+        logger.logFine("Finestra temporale considerata: [" + windowStart + " -> " + windowEnd + "]");
 
         List<GitCommit> allCommits = loadAndFilterCommits(repoName, windowedReleases, windowStart, windowEnd);
         List<GitCommit> commits = allCommits.stream()
@@ -81,7 +81,7 @@ public class Phase2Controller {
 
         long classiBuggy = allClasses.stream().filter(JavaClass::isBuggy).count();
 
-        logger.logInfo("Scrittura dataset...");
+        logger.logFine("Scrittura dataset...");
         List<ClassRecord> records = buildRecords(allClasses);
         printDatasetCsv.write(records);
 
@@ -106,9 +106,9 @@ public class Phase2Controller {
                                                   LocalDate windowEnd)
             throws IOException, InterruptedException {
 
-        logger.logInfo("Leggo commit dal repo locale per " + repoName + "...");
+        logger.logFine("Leggo commit dal repo locale per " + repoName + "...");
         List<GitCommit> allCommits = localGitService.fetchAllCommits();
-        logger.logInfo("Totale commit letti: " + allCommits.size());
+        logger.logFine("Totale commit letti: " + allCommits.size());
 
         // Mantengo solo i commit compresi nella finestra temporale delle release considerate
         List<GitCommit> commits = allCommits.stream()
@@ -119,8 +119,8 @@ public class Phase2Controller {
 
         long commitsFuoriFinestra = (long) allCommits.size() - commits.size();
 
-        logger.logInfo("[CONSISTENCY] Commit nella finestra: " + commits.size() + "/" + allCommits.size());
-        logger.logInfo("[CONSISTENCY] Commit fuori finestra: " + commitsFuoriFinestra);
+        logger.logFine("[CONSISTENCY] Commit nella finestra: " + commits.size() + "/" + allCommits.size());
+        logger.logFine("[CONSISTENCY] Commit fuori finestra: " + commitsFuoriFinestra);
 
         // Ogni commit nella finestra viene assegnato alla release opportuna
         for (GitCommit commit : commits) {
@@ -131,7 +131,7 @@ public class Phase2Controller {
         long commitsConRelease = commits.stream().filter(c -> c.getRelease() != null).count();
         long commitsSenzaRelease = commits.stream().filter(c -> c.getRelease() == null).count();
 
-        logger.logInfo("[CONSISTENCY] Commit nella finestra assegnati a una release: "
+        logger.logFine("[CONSISTENCY] Commit nella finestra assegnati a una release: "
                 + commitsConRelease + "/" + commits.size());
 
         if (commitsSenzaRelease > 0) {
@@ -146,7 +146,7 @@ public class Phase2Controller {
                                                       List<GitCommit> allCommits)
             throws IOException, InterruptedException {
 
-        logger.logInfo("Estrazione classi e calcolo metriche per release...");
+        logger.logFine("Estrazione classi e calcolo metriche per release...");
         List<JavaClass> allClasses = new ArrayList<>();
 
         for (int i = 0; i < windowedReleases.size(); i++) {
@@ -164,20 +164,20 @@ public class Phase2Controller {
 
             metricsServices.computeAllMetrics(classes, commits, release, previousReleaseSha);
 
-            logger.logInfo("[CONSISTENCY] Release " + release.getName()
+            logger.logFine("[CONSISTENCY] Release " + release.getName()
                     + " -> classi estratte: " + classes.size());
 
             allClasses.addAll(classes);
         }
 
-        logger.logInfo("Totale classi estratte: " + allClasses.size());
+        logger.logFine("Totale classi estratte: " + allClasses.size());
 
         long classiUniche = allClasses.stream()
                 .map(JavaClass::getName)
                 .distinct()
                 .count();
 
-        logger.logInfo("[CONSISTENCY] Nomi classe distinti (su tutte le release): " + classiUniche);
+        logger.logFine("[CONSISTENCY] Nomi classe distinti (su tutte le release): " + classiUniche);
 
         return allClasses;
     }
@@ -188,7 +188,7 @@ public class Phase2Controller {
                                List<JavaClass> allClasses,
                                List<ProjectVersion> windowedReleases) {
 
-        logger.logInfo("Avvio labeling...");
+        logger.logFine("Avvio labeling...");
         List<BugTicketRecord> projectTickets = tickets.stream()
                 .filter(t -> t.getProjectKey().equals(projectKey))
                 .toList();
@@ -201,7 +201,7 @@ public class Phase2Controller {
                 .filter(t -> t.getInjectionVersion() == null)
                 .count();
 
-        logger.logInfo("[CONSISTENCY] Ticket del progetto: " + projectTickets.size()
+        logger.logFine("[CONSISTENCY] Ticket del progetto: " + projectTickets.size()
                 + " | con IV: " + ticketsConIV
                 + " | senza IV (saltati): " + ticketsSenzaIV);
 
@@ -220,17 +220,17 @@ public class Phase2Controller {
             }
         }
 
-        logger.logInfo("[CONSISTENCY] Ticket con almeno un commit nella finestra: "
+        logger.logFine("[CONSISTENCY] Ticket con almeno un commit nella finestra: "
                 + ticketsConCommit + " | senza commit: " + ticketsSenzaCommit);
 
         long classiBuggy = allClasses.stream().filter(JavaClass::isBuggy).count();
         long classiClean = allClasses.stream().filter(c -> !c.isBuggy()).count();
 
-        logger.logInfo("[CONSISTENCY] Classi buggy: " + classiBuggy
+        logger.logFine("[CONSISTENCY] Classi buggy: " + classiBuggy
                 + " | classi clean: " + classiClean
                 + " | totale: " + allClasses.size());
 
-        logger.logInfo("Labeling completato per " + projectKey);
+        logger.logFine("Labeling completato per " + projectKey);
 
         return new int[]{ticketsConCommit, ticketsSenzaCommit};
     }
@@ -246,7 +246,7 @@ public class Phase2Controller {
                                           Map<String, LocalDate> releaseNameToDate) {
 
         if (ticket.getInjectionVersion() == null) {
-            logger.logWarning("Ticket " + ticket.getId() + " senza IV -> saltato");
+            logger.logFine("Ticket " + ticket.getId() + " senza IV -> saltato");
             return 0;
         }
 
@@ -255,7 +255,7 @@ public class Phase2Controller {
                 .toList();
 
         if (relevantCommits.isEmpty()) {
-            logger.logWarning("Nessun commit trovato nella finestra per ticket " + ticket.getTicketKey());
+            logger.logFine("Nessun commit trovato nella finestra per ticket " + ticket.getTicketKey());
             return -1;
         }
 

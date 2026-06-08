@@ -47,6 +47,10 @@ public class ProgressLogger {
         logger.log(Level.INFO, "[INFO] {0}", message);
     }
 
+    public void logFine(String message) {
+        logger.log(Level.FINE, "{0}", message);
+    }
+
     public void logWarning(String message) {
         logger.log(Level.WARNING, "[WARN] {0}", message);
     }

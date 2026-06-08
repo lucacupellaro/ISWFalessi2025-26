@@ -19,8 +19,7 @@ import util.ProgressLogger;
 import java.io.File;
 import java.io.IOException;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.logging.*;
 
 public class Main {
 
@@ -28,6 +27,7 @@ public class Main {
     private static final String CSV_PATH = "src/main/java/file/TicketRelease.csv";
 
     public static void main(String[] args) throws IOException, InterruptedException {
+        configureLogging();
         AppConfig config = AppConfig.load();
         int percent = config.getSettings().getMaxVersionsPercent();
 
@@ -120,5 +120,21 @@ public class Main {
         logger.info("Avvio phase3 — MLWeka Pipeline...");
         MLWekaController controller = new MLWekaController();
         controller.normalizeDataset();
+    }
+
+    private static void configureLogging() {
+        Logger rootLogger = Logger.getLogger("");
+        for (Handler h : rootLogger.getHandlers()) {
+            rootLogger.removeHandler(h);
+        }
+        StreamHandler stdoutHandler = new StreamHandler(System.out, new SimpleFormatter()) {
+            @Override
+            public synchronized void publish(LogRecord record) {
+                super.publish(record);
+                flush();
+            }
+        };
+        stdoutHandler.setLevel(Level.ALL);
+        rootLogger.addHandler(stdoutHandler);
     }
 }
